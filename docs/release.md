@@ -21,7 +21,7 @@ checksums.txt            # "<sha256>  <zip 文件名>"
 
 ## 发布步骤
 
-1. 修改 `internal/plugin/types.go` 中的 `Version`（例如 `0.1.1`），提交并推送到 main。
+1. 把 `internal/plugin/types.go` 中的 `Version` 和根目录 `registry.json` 中的 `version` 改成同一个新版本号（例如 `0.1.1`），提交并推送到 main。CI 会检查两者是否一致。
 2. 打 tag 并推送：
 
    ```bash
@@ -39,7 +39,21 @@ bash scripts/build.sh linux/amd64 linux/arm64 windows/amd64
 python3 scripts/package.py --tag v0.1.0     # 输出到 dist/release/
 ```
 
-## 上架官方插件商店
+## 本仓库自带的商店源
+
+根目录的 `registry.json`（`schema_version: 1`）就是一个只包含本插件的商店源。在 CPA 中加入：
+
+```yaml
+plugins:
+  store-sources:
+    - "https://raw.githubusercontent.com/caiyaonan/cpa-plugin-moderration/main/registry.json"
+```
+
+HTTPS 源不需要配置 `store-auth`。CPA 根据条目里的 `repository` 去查找 GitHub **latest release** 并下载对应平台的 zip。`version` 字段只用于显示，实际安装的版本和是否有更新都以 latest release 的 tag 为准。raw.githubusercontent.com 有几分钟的缓存，改完 `registry.json` 后不一定马上生效。
+
+实测（2026-11-25，CPA v8.1.2，全新环境）：CPA 同时列出了官方源和本源，`cpa-moderation` 显示为 `github-release` 类型；通过 `POST /plugin-store/cpa-moderation/install` 安装成功并热加载（`restart_required: false`），状态健康、无警告，商店显示 `installed_version: 0.1.0`、`update_available: false`。
+
+## 上架官方插件商店（可选）
 
 官方源：`https://raw.githubusercontent.com/router-for-me/CLIProxyAPI-Plugins-Store/main/registry.json`（`schema_version: 1`）。
 

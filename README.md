@@ -23,6 +23,32 @@
 
 错误体按客户端格式返回（OpenAI、Anthropic 或 Google 风格），并带上 `request_id`。
 
+## 安装（推荐：本仓库自带的商店源）
+
+在 CLIProxyAPI 的 `config.yaml` 中加入：
+
+```yaml
+plugins:
+  enabled: true
+  dir: "plugins"
+  store-sources:
+    - "https://raw.githubusercontent.com/caiyaonan/cpa-plugin-moderration/main/registry.json"
+```
+
+重启 CPA 后，在 CPAMC 的插件商店里找到「CPA Moderation」点安装即可；也可以直接调用管理接口：
+
+```bash
+curl -X POST -H "Authorization: Bearer <管理密钥>"   "http://<CPA 地址>/v0/management/plugin-store/cpa-moderation/install"
+```
+
+CPA 会从本仓库的 GitHub Release 下载对应平台的包，校验 `checksums.txt` 后安装到 `plugins/<系统>/<架构>/` 并热加载，不需要重启。发布新版本后，商店里会显示有更新。
+
+Docker 部署还需要：
+- 把 `plugins` 目录挂载出来（例如 `./plugins:/CLIProxyAPI/plugins`），插件文件和规则数据都在里面，不挂载的话重建容器就会丢失。
+- 用环境变量传入审核 Key：`OPENAI_MODERATION_API_KEY=sk-...`，不要写进 `config.yaml`。
+
+装好后打开 `http://<CPA 地址>/v0/resource/plugins/cpa-moderation/ui` 配置规则。也可以从 [Releases](https://github.com/caiyaonan/cpa-plugin-moderration/releases) 手动下载 zip，把里面的库文件放进 `plugins/` 后重启。
+
 ## 构建
 
 需要 Go 1.24 以上和一个 C 编译器（CGO）。下面用 zig 作为 C 编译器（`pip install ziglang`）：
