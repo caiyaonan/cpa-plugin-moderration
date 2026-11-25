@@ -6,7 +6,7 @@
       "name": "CPA Moderation",
       "description": "Moderate requests from selected API keys and models with local wordlists and the OpenAI moderation API before they reach upstream.",
       "author": "caiyaonan",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "repository": "https://github.com/caiyaonan/cpa-plugin-moderration",
       "homepage": "https://github.com/caiyaonan/cpa-plugin-moderration",
       "license": "MIT",

@@ -103,7 +103,8 @@ plugins:
       state_file: "plugins/cpa-moderation-state-v1.db"
       openai:
         base_url: "https://api.openai.com/v1"
-        api_key_env: "OPENAI_MODERATION_API_KEY"   # 只从环境变量读取，不写进配置和页面
+        api_key: ""                                # 可直接填写，优先于环境变量（v0.1.1 起）
+        api_key_env: "OPENAI_MODERATION_API_KEY"   # api_key 为空时从这个环境变量读取
         model: "omni-moderation-latest"
         proxy_url: ""                    # 可选，访问 OpenAI 的出口代理
         timeout_ms: 8000
@@ -210,7 +211,7 @@ plugins:
 
 - 状态存储：SQLite（`mattn/go-sqlite3`，插件本身就是 CGO 构建，与 key-billing 一致），保存规则、绑定、词库和审核日志。schema 版本化，迁移失败就回滚，不能删除数据。
 - 日志字段：时间、request_id、scope 打码、模型、接口、规则 ID、结论、类别、耗时、缓存命中、错误类型。**禁止**保存明文 Key、Authorization、prompt 原文、图片、Base64。
-- 管理接口继承 CPA 管理鉴权；OpenAI Key 只从环境变量读取，页面上只显示“已配置/未配置”。
+- 管理接口继承 CPA 管理鉴权；OpenAI Key 可写在插件配置 `openai.api_key` 中（优先），也可以从环境变量读取；插件从不回显 Key，页面上只显示“已配置（插件配置/环境变量）/未配置”。
 - 审核内容会发送给 OpenAI，部署方需要确认隐私和数据处理是否合规。
 - 已知或疑似 CSAM 不得提交给普通 Moderation API，测试中也不得使用真实违规素材。
 

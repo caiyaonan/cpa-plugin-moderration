@@ -43,9 +43,21 @@ curl -X POST -H "Authorization: Bearer <管理密钥>"   "http://<CPA 地址>/v0
 
 CPA 会从本仓库的 GitHub Release 下载对应平台的包，校验 `checksums.txt` 后安装到 `plugins/<系统>/<架构>/` 并热加载，不需要重启。发布新版本后，商店里会显示有更新。
 
-Docker 部署还需要：
-- 把 `plugins` 目录挂载出来（例如 `./plugins:/CLIProxyAPI/plugins`），插件文件和规则数据都在里面，不挂载的话重建容器就会丢失。
-- 用环境变量传入审核 Key：`OPENAI_MODERATION_API_KEY=sk-...`，不要写进 `config.yaml`。
+配置审核用的 OpenAI API Key，二选一（插件配置优先）：
+
+```yaml
+plugins:
+  configs:
+    cpa-moderation:
+      openai:
+        api_key: "sk-proj-..."     # 方式一：直接写在插件配置里
+```
+
+方式二：不写 `api_key`，设置环境变量 `OPENAI_MODERATION_API_KEY`（Docker 中用 `environment:`，修改后需要 `docker compose up -d` 重建容器）。
+
+写在插件配置里时，修改后会自动热更新，不需要重启。插件不会在状态、日志、审计、事件或错误信息中输出 Key。但 CPA 自己的管理接口 `GET /v0/management/plugins/cpa-moderation/config` 会原样返回插件配置，持有管理密钥的人能看到它；另外要注意 `config.yaml` 的文件权限和备份。
+
+Docker 部署时还要把 `plugins` 目录挂载出来（例如 `./plugins:/CLIProxyAPI/plugins`）：插件文件和规则数据都在里面，不挂载的话重建容器就会丢失。
 
 装好后打开 `http://<CPA 地址>/v0/resource/plugins/cpa-moderation/ui` 配置规则。也可以从 [Releases](https://github.com/caiyaonan/cpa-plugin-moderration/releases) 手动下载 zip，把里面的库文件放进 `plugins/` 后重启。
 

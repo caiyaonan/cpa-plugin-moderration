@@ -13,7 +13,8 @@ plugins:
       remote_images: "pass"  # pass: URL is sent to the moderation API; deny: reject
       openai:
         base_url: "https://api.openai.com/v1"
-        api_key_env: "OPENAI_MODERATION_API_KEY"  # set this env var on the CPA container
+        api_key: ""                               # OpenAI API key; takes precedence over api_key_env
+        api_key_env: "OPENAI_MODERATION_API_KEY"  # used when api_key is empty
         model: "omni-moderation-latest"
         proxy_url: ""
         timeout_ms: 8000

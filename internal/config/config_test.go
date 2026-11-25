@@ -43,3 +43,19 @@ func TestUnknownFieldsWarnAndBadValuesFail(t *testing.T) {
 		}
 	}
 }
+
+func TestAPIKeyInConfig(t *testing.T) {
+	cfg, warnings, err := Decode([]byte("openai:\n  api_key: sk-test-123\n"))
+	if err != nil || len(warnings) != 0 || cfg.OpenAI.APIKey != "sk-test-123" {
+		t.Fatalf("api_key must be a known field: %v %v %q", err, warnings, cfg.OpenAI.APIKey)
+	}
+	if _, _, err := Decode([]byte("openai:\n  api_key: \"sk bad\"\n")); err == nil {
+		t.Fatal("api_key with whitespace must be rejected")
+	}
+	if _, _, err := Decode([]byte("openai:\n  api_key: sk-x\n  api_key_env: \"\"\n")); err != nil {
+		t.Fatalf("api_key alone is enough: %v", err)
+	}
+	if _, _, err := Decode([]byte("openai:\n  api_key_env: \"\"\n")); err == nil {
+		t.Fatal("neither api_key nor api_key_env must fail")
+	}
+}

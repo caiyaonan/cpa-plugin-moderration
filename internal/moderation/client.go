@@ -29,6 +29,7 @@ var (
 
 type Options struct {
 	BaseURL          string
+	APIKey           string // used when non-empty; otherwise read from APIKeyEnv
 	APIKeyEnv        string
 	Model            string
 	ProxyURL         string
@@ -73,7 +74,28 @@ func New(opt Options) (*Client, error) {
 
 func (c *Client) Model() string { return c.opt.Model }
 
-func (c *Client) KeyConfigured() bool { return strings.TrimSpace(c.getenv(c.opt.APIKeyEnv)) != "" }
+// KeySource reports where the API key comes from: "config", "env" or "".
+func (c *Client) KeySource() string {
+	if strings.TrimSpace(c.opt.APIKey) != "" {
+		return "config"
+	}
+	if c.opt.APIKeyEnv != "" && strings.TrimSpace(c.getenv(c.opt.APIKeyEnv)) != "" {
+		return "env"
+	}
+	return ""
+}
+
+func (c *Client) KeyConfigured() bool { return c.KeySource() != "" }
+
+func (c *Client) apiKey() string {
+	if k := strings.TrimSpace(c.opt.APIKey); k != "" {
+		return k
+	}
+	if c.opt.APIKeyEnv == "" {
+		return ""
+	}
+	return strings.TrimSpace(c.getenv(c.opt.APIKeyEnv))
+}
 
 // PurgeCache drops cached verdicts, e.g. after a policy change.
 func (c *Client) PurgeCache() { c.cache.Purge() }
@@ -99,9 +121,9 @@ func (c *Client) Moderate(ctx context.Context, items []Item) (Verdict, error) {
 	if len(items) == 0 {
 		return v, nil
 	}
-	key := strings.TrimSpace(c.getenv(c.opt.APIKeyEnv))
+	key := c.apiKey()
 	if key == "" {
-		return v, fmt.Errorf("%w: environment variable %s is not set", ErrUnavailable, c.opt.APIKeyEnv)
+		return v, fmt.Errorf("%w: no API key: set openai.api_key in the plugin config or environment variable %s", ErrUnavailable, c.opt.APIKeyEnv)
 	}
 
 	var texts, images []pending

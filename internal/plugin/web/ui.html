@@ -380,7 +380,9 @@ function viewOverview() {
   if (st.healthy === false) notices.push(h("div", { class: "notice error" }, "插件配置异常，所有请求都会被拒绝（503），直到修复：", h("br"), h("code", {}, st.error || "")));
   if ((st.warnings || []).length) notices.push(h("div", { class: "notice warn" }, "CPA 配置中有插件不认识的字段，已忽略（可能是拼写错误）：", h("ul", {}, st.warnings.map((w) => h("li", { class: "mono" }, w)))));
   if (st.healthy && st.enabled === false) notices.push(h("div", { class: "notice warn" }, "插件已在 CPA 配置中被禁用（enabled: false），当前不审核任何请求。"));
-  if (st.api_key_configured === false) notices.push(h("div", { class: "notice warn" }, "未设置审核 API Key 环境变量 ", h("code", {}, st.api_key_env || ""), "。命中规则的请求会因审核服务不可用而被拒绝。"));
+  if (st.api_key_configured === false) notices.push(h("div", { class: "notice warn" }, "未配置审核 API Key。请在 CPA 配置的 ",
+    h("code", {}, "plugins.configs.cpa-moderation.openai.api_key"), " 中填写，或设置环境变量 ", h("code", {}, st.api_key_env || "OPENAI_MODERATION_API_KEY"),
+    "。在此之前，命中规则的请求都会因审核服务不可用而被拒绝（503）。"));
   if (st.healthy && !st.bound_keys) notices.push(h("div", { class: "notice info" }, "还没有 Key 绑定审核规则，目前不会审核任何请求。到「API Key」页面绑定规则。"));
   if (S.modelsError) notices.push(h("div", { class: "notice warn" }, "无法读取 CPA 模型列表：" + S.modelsError));
   const total = (c.allowed || 0) + (c.blocked || 0) + (c.errors || 0);
@@ -393,7 +395,7 @@ function viewOverview() {
       h("div", { class: "grid" },
         stat("插件版本", st.version || "—"),
         stat("审核模型", st.model || "—"),
-        stat("审核 API Key", st.api_key_configured ? "已配置" : "未配置"),
+        stat("审核 API Key", !st.api_key_configured ? "未配置" : st.api_key_source === "config" ? "已配置（插件配置）" : "已配置（环境变量）"),
         stat("规则 / 已绑定 Key", (st.rules ?? "—") + " / " + (st.bound_keys ?? "—")),
         stat("已同步 Key", st.keys ?? "—"),
       )),

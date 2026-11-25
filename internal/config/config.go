@@ -34,7 +34,10 @@ type Config struct {
 }
 
 type OpenAI struct {
-	BaseURL          string `yaml:"base_url" json:"base_url"`
+	BaseURL string `yaml:"base_url" json:"base_url"`
+	// APIKey, when set, is used directly and takes precedence over APIKeyEnv.
+	// It is never echoed back by the plugin (status, logs, events, registration).
+	APIKey           string `yaml:"api_key" json:"api_key"`
 	APIKeyEnv        string `yaml:"api_key_env" json:"api_key_env"`
 	Model            string `yaml:"model" json:"model"`
 	ProxyURL         string `yaml:"proxy_url" json:"proxy_url"`
@@ -142,8 +145,11 @@ func (c Config) Validate() error {
 			add("openai.proxy_url is invalid")
 		}
 	}
-	if strings.TrimSpace(c.OpenAI.APIKeyEnv) == "" {
-		add("openai.api_key_env is required")
+	if strings.ContainsAny(c.OpenAI.APIKey, " \t\r\n") {
+		add("openai.api_key must not contain whitespace")
+	}
+	if strings.TrimSpace(c.OpenAI.APIKeyEnv) == "" && c.OpenAI.APIKey == "" {
+		add("openai.api_key or openai.api_key_env is required")
 	}
 	if strings.TrimSpace(c.OpenAI.Model) == "" {
 		add("openai.model is required")

@@ -72,6 +72,7 @@ func (a *App) host() HostCaller {
 func defaultModerator(cfg config.Config) (engine.Moderator, *moderation.Client, error) {
 	c, err := moderation.New(moderation.Options{
 		BaseURL:          cfg.OpenAI.BaseURL,
+		APIKey:           cfg.OpenAI.APIKey,
 		APIKeyEnv:        cfg.OpenAI.APIKeyEnv,
 		Model:            cfg.OpenAI.Model,
 		ProxyURL:         cfg.OpenAI.ProxyURL,
@@ -223,7 +224,7 @@ func (a *App) registration() Registration {
 			GitHubRepository: GitHubRepository,
 			ConfigFields: []ConfigField{
 				{Name: "state_file", Type: "string", Default: d.StateFile, Description: "Rules, wordlists and key bindings (JSON)"},
-				{Name: "openai", Type: "object", Default: d.OpenAI, Description: "Moderation API: base_url, api_key_env, model, proxy_url, timeouts, concurrency, cache"},
+				{Name: "openai", Type: "object", Default: d.OpenAI, Description: "Moderation API: base_url, api_key (or api_key_env), model, proxy_url, timeouts, concurrency, cache. api_key takes precedence over the environment variable"},
 				{Name: "limits", Type: "object", Default: d.Limits, Description: "Maximum body, text and image sizes for moderated requests"},
 				{Name: "remote_images", Type: "enum", EnumValues: []string{"pass", "deny"}, Default: d.RemoteImages, Description: "pass: send image URLs to the moderation API; deny: reject them"},
 				{Name: "audit_max_mb", Type: "integer", Default: d.AuditMaxMB, Description: "Rotate the audit file at this size (one backup kept)"},

@@ -212,3 +212,42 @@ func TestCacheExpiryAndLRU(t *testing.T) {
 		t.Fatal("purge")
 	}
 }
+
+func TestAPIKeyFromConfigTakesPrecedence(t *testing.T) {
+	var gotAuth atomic.Value
+	api := &fakeAPI{handle: flagWord}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth.Store(r.Header.Get("Authorization"))
+		r.Header.Set("Authorization", "Bearer test-key") // satisfy fakeAPI
+		api.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	newWith := func(key, env string) *Client {
+		c, err := New(Options{BaseURL: srv.URL + "/v1", APIKey: key, APIKeyEnv: "K", Model: "m", Timeout: time.Second,
+			MaxInflight: 1, TextsPerRequest: 4, ImagesPerRequest: 1, ChunkChars: 100})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.getenv = func(string) string { return env }
+		return c
+	}
+	c := newWith("from-config", "from-env")
+	if _, err := c.Moderate(context.Background(), []Item{{Text: "a"}}); err != nil {
+		t.Fatal(err)
+	}
+	if gotAuth.Load() != "Bearer from-config" || c.KeySource() != "config" {
+		t.Fatalf("config key must win: auth=%v source=%s", gotAuth.Load(), c.KeySource())
+	}
+	c = newWith("", "from-env")
+	if _, err := c.Moderate(context.Background(), []Item{{Text: "b"}}); err != nil {
+		t.Fatal(err)
+	}
+	if gotAuth.Load() != "Bearer from-env" || c.KeySource() != "env" {
+		t.Fatalf("env fallback: auth=%v source=%s", gotAuth.Load(), c.KeySource())
+	}
+	c = newWith("", "")
+	_, err := c.Moderate(context.Background(), []Item{{Text: "c"}})
+	if !errors.Is(err, ErrUnavailable) || !strings.Contains(err.Error(), "openai.api_key") || c.KeyConfigured() {
+		t.Fatalf("missing key: %v", err)
+	}
+}

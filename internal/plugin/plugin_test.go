@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -558,5 +559,63 @@ func TestConfigFieldDefaultsUseYAMLKeys(t *testing.T) {
 	call(t, b, MethodPluginRegister, LifecycleRequest{ConfigYAML: yml})
 	if rt := b.rt.Load(); rt.broken != nil || len(rt.warnings) != 0 {
 		t.Fatalf("advertised defaults must load cleanly: broken=%v warnings=%v", rt.broken, rt.warnings)
+	}
+}
+
+func TestAPIKeyFromPluginConfigIsNeverEchoed(t *testing.T) {
+	const secret = "sk-proj-SECRETVALUE-do-not-leak"
+	dir := t.TempDir()
+	a := NewApp()
+	a.logger = nil
+	t.Cleanup(a.Shutdown)
+	var logs []string
+	a.SetHostCaller(func(method string, payload []byte) ([]byte, error) {
+		if method == "host.log" {
+			logs = append(logs, string(payload))
+		}
+		return []byte(`{"ok":true,"result":{}}`), nil
+	})
+	// Real moderation client against a server that always fails: exercises the error paths too.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+secret {
+			t.Errorf("server did not receive the configured key")
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":{"message":"Incorrect API key provided: ` + secret + `"}}`))
+	}))
+	t.Cleanup(srv.Close)
+	cfg := fmt.Sprintf("state_file: %q\naudit_file: %q\nopenai:\n  base_url: %q\n  api_key: %q\n  api_key_env: \"\"\n",
+		filepath.ToSlash(filepath.Join(dir, "state.json")), filepath.ToSlash(filepath.Join(dir, "audit.jsonl")), srv.URL+"/v1", secret)
+	reg := call(t, a, MethodPluginRegister, LifecycleRequest{ConfigYAML: []byte(cfg)})
+	if rt := a.rt.Load(); rt.broken != nil {
+		t.Fatalf("configure: %v", rt.broken)
+	}
+	setupPolicy(t, a)
+	r := intercept(t, a, bizKey, "openai", "gpt-image-1", chat("hello"))
+	if r.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("provider 401 must fail closed: %+v", r)
+	}
+	_, status := mgmt(t, a, http.MethodGet, "/status", nil)
+	if status["api_key_source"] != "config" || status["api_key_configured"] != true {
+		t.Fatalf("status must report the source: %v", status)
+	}
+	_, test := mgmt(t, a, http.MethodPost, "/provider/test", nil)
+	_, events := mgmt(t, a, http.MethodGet, "/events", nil)
+	audit, _ := os.ReadFile(filepath.Join(dir, "audit.jsonl"))
+	stateFile, _ := os.ReadFile(filepath.Join(dir, "state.json"))
+	surfaces := map[string]string{
+		"registration": string(reg.Result),
+		"status":       fmt.Sprint(status),
+		"provider":     fmt.Sprint(test),
+		"events":       fmt.Sprint(events),
+		"audit":        string(audit),
+		"state":        string(stateFile),
+		"refusal":      string(r.ResponseBody),
+		"logs":         strings.Join(logs, "\n"),
+	}
+	for name, text := range surfaces {
+		if strings.Contains(text, secret) || strings.Contains(text, "SECRETVALUE") {
+			t.Errorf("API key leaked through %s", name)
+		}
 	}
 }

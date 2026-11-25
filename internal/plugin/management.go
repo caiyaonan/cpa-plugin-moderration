@@ -102,6 +102,7 @@ func (a *App) status(ManagementRequest) ManagementResponse {
 	a.mu.Unlock()
 	if client != nil {
 		out["api_key_configured"] = client.KeyConfigured()
+		out["api_key_source"] = client.KeySource() // "config", "env" or ""; never the key itself
 		out["api_key_env"] = rt.cfg.OpenAI.APIKeyEnv
 	}
 	if store != nil {
