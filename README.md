@@ -99,3 +99,7 @@ go vet ./... && go test ./...
 
 - [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)：插件 ABI、宿主契约和示例插件。
 - [cpa-plugin-key-billing](https://github.com/haowang02/cpa-plugin-key-billing)（MIT）：C ABI 胶水代码、管理页挂载方式、Key 同步，以及同源复用 CPAMC 管理密钥的做法，本项目参照了其实现。
+
+## 许可证
+
+[MIT](LICENSE)
