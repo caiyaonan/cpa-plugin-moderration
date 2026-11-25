@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "plugins": [
+    {
+      "id": "cpa-moderation",
+      "name": "CPA Moderation",
+      "description": "Moderate requests from selected API keys and models with local wordlists and the OpenAI moderation API before they reach upstream.",
+      "author": "caiyaonan",
+      "version": "0.1.0",
+      "repository": "https://github.com/caiyaonan/cpa-plugin-moderration",
+      "homepage": "https://github.com/caiyaonan/cpa-plugin-moderration",
+      "license": "MIT",
+      "tags": [
+        "moderation",
+        "safety",
+        "request-interceptor"
+      ],
+      "locales": {
+        "zh-CN": {
+          "name": "CPA 内容审核",
+          "description": "对指定 Key 和模型的请求，在发往上游前用本地词库和 OpenAI 审核接口检查文本与图片，违规直接拒绝。"
+        }
+      }
+    }
+  ]
+}

@@ -28,6 +28,22 @@ jobs:
         run: |
           unformatted=$(gofmt -l .)
           if [ -n "$unformatted" ]; then echo "$unformatted"; exit 1; fi
+      - name: registry.json matches plugin metadata
+        run: |
+          python3 - <<'EOF'
+          import json, re
+          src = open("internal/plugin/types.go", encoding="utf-8").read()
+          version = re.search(r'Version\s*=\s*"([^"]+)"', src).group(1)
+          repo = re.search(r'GitHubRepository\s*=\s*"([^"]+)"', src).group(1)
+          reg = json.load(open("registry.json", encoding="utf-8"))
+          assert reg["schema_version"] == 1, "registry schema_version must be 1"
+          (p,) = [p for p in reg["plugins"] if p["id"] == "cpa-moderation"]
+          assert p["version"] == version, f"registry.json version {p['version']} != plugin Version {version}"
+          assert p["repository"] == repo, f"registry.json repository {p['repository']} != {repo}"
+          for k in ("id", "name", "description", "author", "repository"):
+              assert p.get(k), f"registry.json missing {k}"
+          print("registry.json OK:", version)
+          EOF
       - name: go vet
         run: go vet ./...
       - name: go test -race
