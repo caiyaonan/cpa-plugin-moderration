@@ -1,0 +1,24 @@
+{
+  "revision": 0,
+  "rules": [
+    {
+      "id": "image-business",
+      "name": "生图业务",
+      "enabled": true,
+      "models": ["gpt-image-*", "gpt-6*"],
+      "formats": [],
+      "check_text": true,
+      "check_image": true,
+      "include_roles": ["system", "user", "tool"],
+      "history_last_n": 0,
+      "category_actions": {},
+      "wordlists": ["business-words"],
+      "unsupported_content": "deny",
+      "on_error": "deny"
+    }
+  ],
+  "wordlists": [
+    { "id": "business-words", "name": "业务词库", "enabled": true, "keywords": [], "regex": [] }
+  ],
+  "keys": []
+}

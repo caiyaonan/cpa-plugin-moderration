@@ -1,0 +1,61 @@
+config-version: 8
+server:
+  host: "127.0.0.1"
+  port: 18319
+management:
+  allow-remote: false
+  secret-key: "combo-mgmt-secret"   # test-only; matches run_combo.sh
+  disable-control-panel: true
+access:
+  api-keys:
+    - "sk-poc-image-business"
+    - "sk-poc-other"
+routing:
+  retry:
+    request-retry: 2
+  cooldown:
+    disable-cooling: true
+api-keys:
+  openai-compatibility:
+    - name: "mock-a"
+      base-url: "http://127.0.0.1:18082/v1"
+      keys:
+        - api-key: "upstream-a"
+      models:
+        - name: "mock-chat"
+          alias: "mock-chat"
+        - name: "gpt-image-1"
+          alias: "gpt-image-1"
+          image: true
+        - name: "gpt-6-mini"
+          alias: "gpt-6-mini"
+        - name: "gpt-6-mini"
+          alias: "friendly-alias"
+  claude:
+    - name: "claude-mock"
+      base-url: "http://127.0.0.1:18082"
+      keys:
+        - api-key: "upstream-claude"
+      models:
+        - name: "claude-mock"
+          alias: "claude-mock"
+oauth:
+  auth-dir: "./auth"
+plugins:
+  enabled: true
+  dir: "plugins"
+  configs:
+    cpa-key-billing:
+      enabled: true
+      priority: 100
+      state_file: "plugins/cpa-key-billing-state-v1.db"
+      allow_unpriced_models: true
+    cpa-moderation:
+      enabled: true
+      priority: 200
+      state_file: "plugins/cpa-moderation-state-v1.json"
+      audit_file: "plugins/cpa-moderation-audit.jsonl"
+      openai:
+        base_url: "http://127.0.0.1:18082/v1"
+        api_key_env: "OPENAI_MODERATION_API_KEY"
+        timeout_ms: 3000

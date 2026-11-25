@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>CPA Moderation</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #fff; --ink: #1d2330; --muted: #667085; --line: #e3e6eb; --soft: #f1f3f6;
+  --accent: #2f6fde; --accent-ink: #fff; --ok: #12805c; --ok-bg: #e6f6ef; --bad: #c2362b; --bad-bg: #fdecea;
+  --warn: #9a6400; --warn-bg: #fff4dc; --info-bg: #eaf1fd; --radius: 8px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151b; --panel: #1a1e26; --ink: #e5e8ee; --muted: #98a2b3; --line: #2b313c; --soft: #222833;
+    --accent: #5b8ff0; --ok: #47c590; --ok-bg: #173327; --bad: #f07167; --bad-bg: #3a1d1b; --warn: #f0b84a; --warn-bg: #3a2e14; --info-bg: #1b2a44;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--ink); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 5px 12px; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.danger { color: var(--bad); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button.link { border: 0; background: none; color: var(--accent); padding: 0 4px; }
+input[type=text], input[type=password], input[type=number], select, textarea {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; min-width: 0;
+}
+textarea { width: 100%; font-family: var(--mono); font-size: 13px; resize: vertical; }
+input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent); outline-offset: 0; }
+label.check { display: inline-flex; align-items: center; gap: 5px; margin: 2px 14px 2px 0; white-space: nowrap; }
+code, .mono { font-family: var(--mono); font-size: 12.5px; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+
+header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); }
+.bar { display: flex; align-items: center; gap: 12px; padding: 10px 20px; flex-wrap: wrap; }
+.bar h1 { font-size: 16px; margin: 0 8px 0 0; font-weight: 650; }
+.spacer { flex: 1; }
+nav { display: flex; gap: 2px; padding: 0 14px; overflow-x: auto; }
+nav button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 8px 12px; color: var(--muted); white-space: nowrap; }
+nav button.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+main { padding: 18px 20px 60px; max-width: 1280px; margin: 0 auto; }
+
+.badge { display: inline-block; padding: 0 7px; border-radius: 10px; font-size: 12px; line-height: 20px; background: var(--soft); color: var(--muted); white-space: nowrap; }
+.badge.ok { background: var(--ok-bg); color: var(--ok); }
+.badge.bad { background: var(--bad-bg); color: var(--bad); }
+.badge.warn { background: var(--warn-bg); color: var(--warn); }
+.badge.info { background: var(--info-bg); color: var(--accent); }
+
+.notice { border-radius: var(--radius); padding: 9px 12px; margin: 0 0 12px; border: 1px solid transparent; }
+.notice.error { background: var(--bad-bg); color: var(--bad); }
+.notice.warn { background: var(--warn-bg); color: var(--warn); }
+.notice.info { background: var(--info-bg); }
+.notice.ok { background: var(--ok-bg); color: var(--ok); }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+.panel h2 { font-size: 15px; margin: 0 0 12px; }
+.panel h3 { font-size: 13.5px; margin: 16px 0 6px; }
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.stat { background: var(--soft); border-radius: var(--radius); padding: 12px; }
+.stat .v { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.stat .v.text { font-size: 15px; line-height: 1.4; padding-top: 4px; }
+.stat .k { color: var(--muted); font-size: 12.5px; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12.5px; color: var(--muted); font-weight: 600; background: var(--soft); position: sticky; top: 0; }
+tr:hover td { background: color-mix(in srgb, var(--soft) 60%, transparent); }
+.table-wrap { overflow: auto; max-height: 64vh; border: 1px solid var(--line); border-radius: var(--radius); }
+.table-wrap table.wide { min-width: 1080px; }
+.nowrap { white-space: nowrap; }
+.table-wrap table th:first-child, .table-wrap table td:first-child { padding-left: 12px; }
+
+.split { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
+.list { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--panel); }
+.list .item { padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.list .item:last-child { border-bottom: 0; }
+.list .item.active { background: var(--info-bg); }
+.list .item .t { font-weight: 600; display: flex; gap: 6px; align-items: center; }
+.field { margin-bottom: 14px; }
+.field > .lbl { display: block; font-weight: 600; margin-bottom: 4px; }
+.field .hint { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.row > .field { flex: 1 1 220px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); border-radius: 14px; padding: 1px 9px; font-size: 12.5px; font-family: var(--mono); background: var(--soft); }
+.chip.on { background: var(--info-bg); border-color: var(--accent); color: var(--accent); }
+.picker { max-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+.picker label.check { display: flex; margin: 2px 0; }
+
+#toast { position: fixed; right: 18px; bottom: 18px; z-index: 20; display: flex; flex-direction: column; gap: 8px; max-width: min(460px, 92vw); }
+#toast .notice { box-shadow: 0 4px 16px rgba(0,0,0,.12); margin: 0; }
+
+#gate { max-width: 420px; margin: 12vh auto; }
+#gate .panel { padding: 24px; }
+.result pre { white-space: pre-wrap; word-break: break-word; background: var(--soft); padding: 10px; border-radius: 6px; margin: 0; font-size: 12.5px; }
+
+@media (max-width: 820px) {
+  .split { grid-template-columns: 1fr; }
+  main { padding: 12px; }
+  .bar { padding: 10px 12px; }
+}
+</style>
+</head>
+<body>
+<div id="gate" class="hidden">
+  <div class="panel">
+    <h2>CPA Moderation 管理</h2>
+    <p class="muted small">请输入 CLIProxyAPI 管理密钥。密钥只保存在当前标签页（sessionStorage），关闭标签页后失效。</p>
+    <div id="gate-msg"></div>
+    <form id="gate-form" autocomplete="off">
+      <div class="field"><input id="gate-key" type="password" placeholder="管理密钥" style="width:100%" autocomplete="current-password"></div>
+      <button class="primary" type="submit" style="width:100%">登录</button>
+    </form>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <div class="bar">
+      <h1>CPA Moderation</h1>
+      <span id="hdr-health"></span>
+      <span id="hdr-rev" class="muted small"></span>
+      <span class="spacer"></span>
+      <span id="dirty" class="badge warn hidden">有未保存的修改</span>
+      <button id="btn-discard" disabled>放弃修改</button>
+      <button id="btn-save" class="primary" disabled>保存</button>
+      <button id="btn-logout" class="link">退出</button>
+    </div>
+    <nav id="tabs"></nav>
+  </header>
+  <main id="view"></main>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+(() => {
+const BASE = "/v0/management/plugins/cpa-moderation";
+const KEY_STORE = "cpa-moderation:mgmt-key";
+const FORMATS = [["openai", "OpenAI Chat"], ["openai-response", "OpenAI Responses / Codex"], ["openai-image", "Images"], ["claude", "Claude"], ["gemini", "Gemini"]];
+const ROLES = [["system", "system / developer"], ["user", "user"], ["assistant", "assistant（模型历史输出）"], ["tool", "tool（工具结果）"]];
+const DEFAULT_ROLES = ["system", "user", "tool"];
+const CATEGORIES = ["harassment", "harassment/threatening", "hate", "hate/threatening", "illicit", "illicit/violent",
+  "self-harm", "self-harm/intent", "self-harm/instructions", "sexual", "sexual/minors", "violence", "violence/graphic"];
+const NEVER_LOG = new Set(["sexual/minors"]);
+const TABS = [["overview", "概览"], ["keys", "API Key"], ["rules", "审核规则"], ["wordlists", "词库"], ["simulate", "模拟测试"], ["events", "审核记录"]];
+
+const S = { key: "", tab: "overview", server: null, draft: null, status: null, models: null, modelsError: "", events: [],
+  selRule: null, selList: null, newIds: new Set(), keyFilter: "", keySel: new Set(), evOutcome: "", simResult: null };
+
+// ---------- DOM helpers (all text via textContent: no HTML injection) ----------
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "class") el.className = v;
+    else if (k === "value") el.value = v;
+    else if (k === "checked" || k === "disabled" || k === "selected") el[k] = !!v;
+    else el.setAttribute(k, v === true ? "" : String(v));
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid === null || kid === undefined || kid === false) continue;
+    el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+const $ = (id) => document.getElementById(id);
+const clone = (v) => JSON.parse(JSON.stringify(v));
+function toast(text, kind = "info", ms = 4200) {
+  const n = h("div", { class: "notice " + kind }, text);
+  $("toast").append(n);
+  setTimeout(() => n.remove(), ms);
+}
+function badge(text, kind) { return h("span", { class: "badge " + (kind || "") }, text); }
+function lines(text) { return text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean); }
+function uniq(arr) { return [...new Set(arr)]; }
+function fmtTime(t) { const d = new Date(t); return isNaN(d) ? t : d.toLocaleString("zh-CN", { hour12: false }); }
+
+// Same glob semantics as the plugin: * any run, ? one char, case-sensitive.
+function glob(p, n) {
+  p = [...p]; n = [...n];
+  let pi = 0, ni = 0, sp = -1, sn = 0;
+  while (ni < n.length) {
+    if (pi < p.length && (p[pi] === "?" || p[pi] === n[ni])) { pi++; ni++; }
+    else if (pi < p.length && p[pi] === "*") { sp = pi; sn = ni; pi++; }
+    else if (sp >= 0) { sn++; pi = sp + 1; ni = sn; }
+    else return false;
+  }
+  while (pi < p.length && p[pi] === "*") pi++;
+  return pi === p.length;
+}
+
+// ---------- API ----------
+class AuthError extends Error {}
+async function api(method, path, body) {
+  const init = { method, cache: "no-store", headers: { Authorization: "Bearer " + S.key } };
+  if (body !== undefined) { init.headers["Content-Type"] = "application/json; charset=utf-8"; init.body = JSON.stringify(body); }
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 30000);
+  init.signal = ctl.signal;
+  let resp, text;
+  try { resp = await fetch(location.origin + path, init); text = await resp.text(); }
+  catch (e) { throw new Error(ctl.signal.aborted ? "请求超时" : "无法连接服务器"); }
+  finally { clearTimeout(timer); }
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (_) {}
+  if (resp.status === 401) throw new AuthError("管理密钥无效或已失效");
+  if (!resp.ok) {
+    const msg = data?.error?.message ?? (typeof data?.error === "string" ? data.error : "");
+    const e = new Error(msg ? String(msg).slice(0, 600) : "HTTP " + resp.status);
+    e.status = resp.status; e.code = data?.error?.code;
+    throw e;
+  }
+  return data;
+}
+async function guard(fn) {
+  try { return await fn(); }
+  catch (e) {
+    if (e instanceof AuthError) { logout(e.message); return; }
+    toast(e.message || String(e), "error", 8000);
+  }
+}
+
+// ---------- auth ----------
+// CPAMC (the CPA management panel) on the same origin keeps its key in localStorage, lightly obfuscated.
+function panelKey() {
+  const read = (name) => {
+    try {
+      const raw = localStorage.getItem(name);
+      if (!raw) return null;
+      const m = /^enc::v([12])::/.exec(raw);
+      if (!m) return JSON.parse(raw);
+      const scopes = m[1] === "2" ? [location.host, "v2|" + location.host] : [location.host + "|" + navigator.userAgent];
+      const bytes = Uint8Array.from(atob(raw.slice(m[0].length)), (c) => c.charCodeAt(0));
+      for (const scope of scopes) {
+        const secret = new TextEncoder().encode("cli-proxy-api-webui::secure-storage|" + scope);
+        try { return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes.map((b, i) => b ^ secret[i % secret.length]))); } catch (_) {}
+      }
+    } catch (_) {}
+    return null;
+  };
+  const a = read("cli-proxy-auth")?.state?.managementKey;
+  if (typeof a === "string" && a.trim()) return a.trim();
+  const b = read("managementKey");
+  return typeof b === "string" ? b.trim() : "";
+}
+function showGate(msg) {
+  $("app").classList.add("hidden");
+  $("gate").classList.remove("hidden");
+  $("gate-msg").replaceChildren(msg ? h("div", { class: "notice error" }, msg) : "");
+  $("gate-key").focus();
+}
+function logout(msg) {
+  S.key = "";
+  try { sessionStorage.removeItem(KEY_STORE); } catch (_) {}
+  showGate(msg);
+}
+async function login(key, remember) {
+  S.key = key;
+  try { await api("GET", BASE + "/status"); }
+  catch (e) { S.key = ""; showGate(e instanceof AuthError ? "管理密钥无效" : e.message); return false; }
+  if (remember) { try { sessionStorage.setItem(KEY_STORE, key); } catch (_) {} }
+  $("gate").classList.add("hidden");
+  $("app").classList.remove("hidden");
+  await reloadAll();
+  return true;
+}
+$("gate-form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const k = $("gate-key").value.trim();
+  if (!k) { showGate("请输入管理密钥"); return; }
+  $("gate-key").value = "";
+  login(k, true);
+});
+$("btn-logout").addEventListener("click", () => {
+  if (isDirty() && !confirm("有未保存的修改，确定退出？")) return;
+  logout("");
+});
+
+// ---------- state ----------
+function isDirty() { return S.draft && S.server && JSON.stringify(S.draft) !== JSON.stringify(S.server); }
+function normalizeState(st) {
+  st.rules ||= []; st.wordlists ||= []; st.keys ||= [];
+  for (const r of st.rules) { r.models ||= []; r.formats ||= []; r.include_roles ||= []; r.wordlists ||= []; r.category_actions ||= {}; }
+  for (const w of st.wordlists) { w.keywords ||= []; w.regex ||= []; }
+  for (const k of st.keys) { k.rule_ids ||= []; }
+  return st;
+}
+async function loadState() {
+  const st = normalizeState(await api("GET", BASE + "/state"));
+  S.server = st; S.draft = clone(st); S.newIds = new Set();
+}
+async function loadStatus() { S.status = await api("GET", BASE + "/status"); }
+async function loadModels() {
+  try { S.models = (await api("GET", BASE + "/models")).models || []; S.modelsError = ""; }
+  catch (e) { if (e instanceof AuthError) throw e; S.models = null; S.modelsError = e.message; }
+}
+async function loadEvents() {
+  const q = new URLSearchParams({ limit: "300" });
+  if (S.evOutcome) q.set("outcome", S.evOutcome);
+  S.events = (await api("GET", BASE + "/events?" + q)).events || [];
+}
+async function reloadAll() {
+  await guard(async () => {
+    await loadStatus();
+    try { await loadState(); } catch (e) { if (e instanceof AuthError) throw e; S.server = null; S.draft = null; toast(e.message, "error", 8000); }
+    await loadModels();
+    if (S.tab === "events") await loadEvents();
+  });
+  render();
+}
+async function save() {
+  if (!isDirty()) return;
+  await guard(async () => {
+    try {
+      const next = normalizeState(await api("PUT", BASE + "/state", S.draft));
+      S.server = next; S.draft = clone(next); S.newIds = new Set();
+      toast("已保存（revision " + next.revision + "），新规则立即生效", "ok");
+      await loadStatus();
+    } catch (e) {
+      if (e.status === 409) toast("保存冲突：配置已被其他人修改。请先放弃修改并重新加载，再重新编辑。", "error", 10000);
+      else throw e;
+    }
+  });
+  render();
+}
+$("btn-save").addEventListener("click", save);
+$("btn-discard").addEventListener("click", () => {
+  if (!confirm("放弃所有未保存的修改？")) return;
+  reloadAll();
+});
+window.addEventListener("beforeunload", (e) => { if (isDirty()) { e.preventDefault(); e.returnValue = ""; } });
+function changed() { renderHeader(); }
+
+// ---------- rendering ----------
+function renderHeader() {
+  const st = S.status;
+  $("hdr-health").replaceChildren(!st ? "" : st.healthy ? badge("运行正常", "ok") : badge("配置异常：拒绝受控请求", "bad"));
+  $("hdr-rev").textContent = S.server ? "revision " + S.server.revision : "";
+  const dirty = isDirty();
+  $("dirty").classList.toggle("hidden", !dirty);
+  $("btn-save").disabled = !dirty;
+  $("btn-discard").disabled = !dirty;
+  $("tabs").replaceChildren(...TABS.map(([id, label]) =>
+    h("button", { class: S.tab === id ? "active" : "", onclick: () => switchTab(id) }, label)));
+}
+async function switchTab(id) {
+  S.tab = id;
+  if (id === "events") await guard(loadEvents);
+  if (id === "overview") await guard(loadStatus);
+  render();
+}
+function render() {
+  renderHeader();
+  const view = $("view");
+  if (!S.draft && S.tab !== "overview") {
+    view.replaceChildren(h("div", { class: "notice error" }, "无法读取审核配置，请先查看「概览」中的错误信息。"));
+    return;
+  }
+  const fn = { overview: viewOverview, keys: viewKeys, rules: viewRules, wordlists: viewWordlists, simulate: viewSimulate, events: viewEvents }[S.tab];
+  view.replaceChildren(fn());
+}
+
+// ---------- overview ----------
+function viewOverview() {
+  const st = S.status || {};
+  const c = st.counters || {};
+  const notices = [];
+  if (st.healthy === false) notices.push(h("div", { class: "notice error" }, "插件配置异常，所有请求都会被拒绝（503），直到修复：", h("br"), h("code", {}, st.error || "")));
+  if ((st.warnings || []).length) notices.push(h("div", { class: "notice warn" }, "CPA 配置中有插件不认识的字段，已忽略（可能是拼写错误）：", h("ul", {}, st.warnings.map((w) => h("li", { class: "mono" }, w)))));
+  if (st.healthy && st.enabled === false) notices.push(h("div", { class: "notice warn" }, "插件已在 CPA 配置中被禁用（enabled: false），当前不审核任何请求。"));
+  if (st.api_key_configured === false) notices.push(h("div", { class: "notice warn" }, "未设置审核 API Key 环境变量 ", h("code", {}, st.api_key_env || ""), "。命中规则的请求会因审核服务不可用而被拒绝。"));
+  if (st.healthy && !st.bound_keys) notices.push(h("div", { class: "notice info" }, "还没有 Key 绑定审核规则，目前不会审核任何请求。到「API Key」页面绑定规则。"));
+  if (S.modelsError) notices.push(h("div", { class: "notice warn" }, "无法读取 CPA 模型列表：" + S.modelsError));
+  const total = (c.allowed || 0) + (c.blocked || 0) + (c.errors || 0);
+  const pct = (n) => total ? (n * 100 / total).toFixed(1) + "%" : "—";
+  const testOut = h("div", { class: "small", style: "margin-top:8px" });
+  return h("div", {},
+    notices,
+    h("div", { class: "panel" },
+      h("h2", {}, "运行状态"),
+      h("div", { class: "grid" },
+        stat("插件版本", st.version || "—"),
+        stat("审核模型", st.model || "—"),
+        stat("审核 API Key", st.api_key_configured ? "已配置" : "未配置"),
+        stat("规则 / 已绑定 Key", (st.rules ?? "—") + " / " + (st.bound_keys ?? "—")),
+        stat("已同步 Key", st.keys ?? "—"),
+      )),
+    h("div", { class: "panel" },
+      h("h2", {}, "请求统计（自插件加载以来）"),
+      h("div", { class: "grid" },
+        stat("已审核通过", c.allowed ?? 0, pct(c.allowed || 0)),
+        stat("已拦截（违规）", c.blocked ?? 0, pct(c.blocked || 0)),
+        stat("拒绝（无法审核/故障）", c.errors ?? 0, pct(c.errors || 0)),
+        stat("未命中规则（未审核）", c.skipped ?? 0),
+      ),
+      h("p", { class: "muted small" }, "“拒绝”表示审核服务不可用、输入无法解析或超限，不代表内容违规。")),
+    h("div", { class: "panel" },
+      h("h2", {}, "审核服务连通性"),
+      h("p", { class: "muted small" }, "发送一段固定的无害文本到审核接口，不包含任何用户数据。"),
+      h("button", { onclick: async (ev) => {
+        ev.target.disabled = true;
+        testOut.replaceChildren("测试中…");
+        try {
+          const r = await api("POST", BASE + "/provider/test");
+          testOut.replaceChildren(h("span", { class: "badge ok" }, "连接正常"), " 延迟 " + r.latency_ms + " ms，模型 " + r.model);
+        } catch (e) {
+          if (e instanceof AuthError) return logout(e.message);
+          testOut.replaceChildren(h("span", { class: "badge bad" }, "失败"), " " + e.message);
+        } finally { ev.target.disabled = false; }
+      } }, "测试连接"),
+      testOut));
+}
+function stat(k, v, sub) { return h("div", { class: "stat" }, h("div", { class: typeof v === "number" ? "v" : "v text" }, String(v)), h("div", { class: "k" }, k, sub ? " · " + sub : "")); }
+
+// ---------- keys ----------
+function ruleName(id) { const r = S.draft.rules.find((x) => x.id === id); return r ? (r.name || r.id) : id; }
+function keyName(k) { return k.label ? k.label + " (" + k.preview + ")" : k.preview || k.scope.slice(0, 12); }
+async function syncKeys() {
+  if (isDirty()) { toast("请先保存或放弃当前修改，再同步 Key。", "warn"); return; }
+  await guard(async () => {
+    const cpa = await api("GET", "/v0/management/api-keys");
+    const keys = (cpa && (cpa["api-keys"] || cpa.keys)) || [];
+    if (!Array.isArray(keys)) throw new Error("CPA 返回的 Key 列表格式无法识别");
+    const r = await api("POST", BASE + "/keys/sync", { keys: keys.map(String), revision: S.server.revision });
+    toast("同步完成：新增 " + r.added + " 个，CPA 中已不存在 " + r.missing + " 个（保留其绑定）", "ok");
+    await loadState(); await loadStatus();
+  });
+  render();
+}
+function viewKeys() {
+  const d = S.draft;
+  const rules = d.rules;
+  const f = S.keyFilter.toLowerCase();
+  const keys = d.keys.filter((k) => !f || (k.preview + " " + (k.label || "") + " " + k.rule_ids.join(" ")).toLowerCase().includes(f));
+  const batchSel = h("select", {}, h("option", { value: "" }, "选择规则…"), rules.map((r) => h("option", { value: r.id }, (r.name || r.id) + (r.enabled ? "" : "（已停用）"))));
+  const batch = (bind) => {
+    const id = batchSel.value;
+    if (!id) { toast("请选择规则", "warn"); return; }
+    if (!S.keySel.size) { toast("请先勾选 Key", "warn"); return; }
+    for (const k of d.keys) {
+      if (!S.keySel.has(k.scope)) continue;
+      k.rule_ids = bind ? uniq([...k.rule_ids, id]) : k.rule_ids.filter((x) => x !== id);
+    }
+    render();
+  };
+  const allChecked = keys.length > 0 && keys.every((k) => S.keySel.has(k.scope));
+  return h("div", {},
+    h("div", { class: "notice info" }, "只有绑定了审核规则的 Key 才会被审核；未绑定的 Key 不做任何审核。插件只保存 Key 的不可逆哈希和打码预览。"),
+    h("div", { class: "panel" },
+      h("div", { class: "toolbar" },
+        h("button", { onclick: syncKeys }, "从 CPA 同步 Key"),
+        h("input", { type: "text", placeholder: "筛选 Key / 备注 / 规则", value: S.keyFilter, oninput: (e) => { S.keyFilter = e.target.value; rerenderKeepFocus(e.target); } }),
+        h("span", { class: "spacer" }),
+        h("span", { class: "muted small" }, "已选 " + S.keySel.size + " 个"),
+        batchSel,
+        h("button", { onclick: () => batch(true) }, "绑定到所选"),
+        h("button", { onclick: () => batch(false) }, "从所选解绑")),
+      !d.keys.length ? h("div", { class: "notice warn" }, "还没有 Key。点击「从 CPA 同步 Key」导入 CLIProxyAPI 配置中的下游 Key。") :
+      h("div", { class: "table-wrap" }, h("table", {},
+        h("thead", {}, h("tr", {},
+          h("th", { style: "width:32px" }, h("input", { type: "checkbox", checked: allChecked, "aria-label": "全选", onchange: (e) => {
+            for (const k of keys) e.target.checked ? S.keySel.add(k.scope) : S.keySel.delete(k.scope);
+            render();
+          } })),
+          h("th", {}, "Key"), h("th", {}, "备注"), h("th", {}, "审核规则（勾选即绑定）"))),
+        h("tbody", {}, keys.map((k) => h("tr", {},
+          h("td", {}, h("input", { type: "checkbox", checked: S.keySel.has(k.scope), "aria-label": "选择 " + k.preview, onchange: (e) => { e.target.checked ? S.keySel.add(k.scope) : S.keySel.delete(k.scope); render(); } })),
+          h("td", {}, h("span", { class: "mono" }, k.preview || "—"), " ", k.missing ? badge("CPA 中已删除", "warn") : null,
+            h("div", { class: "muted small mono", title: k.scope }, k.scope.slice(0, 12) + "…")),
+          h("td", {}, h("input", { type: "text", value: k.label || "", placeholder: "备注", style: "width:100%", oninput: (e) => { k.label = e.target.value.trim() || undefined; if (!k.label) delete k.label; changed(); } })),
+          h("td", {}, !rules.length ? h("span", { class: "muted" }, "还没有规则") :
+            h("div", {}, rules.map((r) => h("label", { class: "check" },
+              h("input", { type: "checkbox", checked: k.rule_ids.includes(r.id), onchange: (e) => {
+                k.rule_ids = e.target.checked ? uniq([...k.rule_ids, r.id]) : k.rule_ids.filter((x) => x !== r.id);
+                changed();
+              } }),
+              r.name || r.id, r.enabled ? "" : " (停用)"))))
+        )))))));
+}
+function rerenderKeepFocus(input) {
+  const pos = input.selectionStart;
+  render();
+  const again = document.querySelector('input[placeholder="' + input.placeholder + '"]');
+  if (again) { again.focus(); try { again.setSelectionRange(pos, pos); } catch (_) {} }
+}
+
+// ---------- rules ----------
+function newRule() {
+  let n = 1;
+  while (S.draft.rules.some((r) => r.id === "rule-" + n)) n++;
+  const r = { id: "rule-" + n, name: "新规则 " + n, enabled: true, models: [], formats: [], check_text: true, check_image: true,
+    include_roles: [...DEFAULT_ROLES], history_last_n: 0, category_actions: {}, wordlists: [], unsupported_content: "deny", on_error: "deny" };
+  S.draft.rules.push(r); S.newIds.add("rule:" + r.id); S.selRule = r.id;
+  render();
+}
+function viewRules() {
+  const d = S.draft;
+  if (!S.selRule || !d.rules.some((r) => r.id === S.selRule)) S.selRule = d.rules[0]?.id || null;
+  const sel = d.rules.find((r) => r.id === S.selRule);
+  return h("div", { class: "split" },
+    h("div", {},
+      h("div", { class: "toolbar" }, h("button", { class: "primary", onclick: newRule }, "新建规则")),
+      h("div", { class: "list" }, !d.rules.length ? h("div", { class: "item muted" }, "暂无规则") :
+        d.rules.map((r) => {
+          const bound = d.keys.filter((k) => k.rule_ids.includes(r.id)).length;
+          return h("div", { class: "item" + (r.id === S.selRule ? " active" : ""), onclick: () => { S.selRule = r.id; render(); } },
+            h("div", { class: "t" }, r.name || r.id, r.enabled ? null : badge("停用")),
+            h("div", { class: "muted small" }, r.models.length + " 个模型规则 · " + bound + " 个 Key"));
+        }))),
+    sel ? ruleEditor(sel) : h("div", { class: "panel muted" }, "新建一条规则，填写要审核的模型，再到「API Key」页面把 Key 绑定到这条规则。"));
+}
+function ruleEditor(r) {
+  const d = S.draft;
+  const isNew = S.newIds.has("rule:" + r.id);
+  const bound = d.keys.filter((k) => k.rule_ids.includes(r.id));
+  const preview = h("div", {});
+  const updatePreview = () => {
+    if (!S.models) { preview.replaceChildren(h("div", { class: "muted small" }, S.modelsError ? "无法读取 CPA 模型列表：" + S.modelsError : "模型列表加载中…")); return; }
+    const matched = S.models.filter((m) => r.models.some((p) => glob(p, m.id)));
+    const dead = r.models.filter((p) => !S.models.some((m) => glob(p, m.id)));
+    preview.replaceChildren(...[
+      h("div", { class: "small" }, "当前 CPA 中匹配到 ", h("b", {}, String(matched.length)), " 个模型：",
+        matched.length ? h("div", { class: "chips", style: "margin-top:4px" }, matched.slice(0, 60).map((m) => h("span", { class: "chip on" }, m.id)), matched.length > 60 ? h("span", { class: "muted" }, "…") : null) : h("span", { class: "muted" }, "无")),
+      dead.length ? h("div", { class: "notice warn small", style: "margin-top:8px" }, "以下规则目前不匹配任何已知模型（拼写错误？大小写？别名需单独填写）：" + dead.join("、")) : null].filter(Boolean));
+  };
+  const modelsTa = h("textarea", { rows: 5, placeholder: "每行一个，例如：\ngpt-image-*\ngpt-6*", oninput: (e) => { r.models = lines(e.target.value); updatePreview(); syncPicker(); changed(); } });
+  modelsTa.value = r.models.join("\n");
+  const pickerFilter = h("input", { type: "text", placeholder: "筛选模型", style: "width:100%;margin-bottom:6px" });
+  const picker = h("div", { class: "picker" });
+  const syncPicker = () => {
+    if (!S.models) { picker.replaceChildren(h("span", { class: "muted small" }, S.modelsError ? "模型列表读取失败" : "加载中…")); return; }
+    const f = pickerFilter.value.trim().toLowerCase();
+    const list = S.models.filter((m) => !f || m.id.toLowerCase().includes(f));
+    picker.replaceChildren(...(list.length ? list.map((m) => h("label", { class: "check" },
+      h("input", { type: "checkbox", checked: r.models.includes(m.id), onchange: (e) => {
+        r.models = e.target.checked ? uniq([...r.models, m.id]) : r.models.filter((x) => x !== m.id);
+        modelsTa.value = r.models.join("\n"); updatePreview(); changed();
+      } }),
+      h("span", { class: "mono" }, m.id), h("span", { class: "muted small" }, m.providers.join(", ")),
+      !r.models.includes(m.id) && r.models.some((p) => glob(p, m.id)) ? badge("已被通配符匹配", "info") : null)) : [h("span", { class: "muted small" }, "无匹配模型")]));
+  };
+  pickerFilter.addEventListener("input", syncPicker);
+  updatePreview(); syncPicker();
+
+  const set = (k) => (e) => { r[k] = e.target.type === "checkbox" ? e.target.checked : e.target.value; changed(); };
+  const toggleIn = (k, v) => (e) => { r[k] = e.target.checked ? uniq([...r[k], v]) : r[k].filter((x) => x !== v); changed(); };
+  const histInput = h("input", { type: "number", min: 1, max: 10000, value: r.history_last_n || 20, style: "width:90px", disabled: !r.history_last_n,
+    oninput: (e) => { r.history_last_n = Math.max(1, parseInt(e.target.value, 10) || 1); changed(); } });
+  const onErrorWarn = h("div", { class: "notice warn small" + (r.on_error === "allow" ? "" : " hidden"), style: "margin-top:6px" }, "审核服务故障时放行，意味着故障期间这些请求不会被审核。");
+  const idInput = h("input", { type: "text", value: r.id, disabled: !isNew, class: "mono", oninput: (e) => {
+    const v = e.target.value.trim();
+    S.newIds.delete("rule:" + r.id); r.id = v; S.newIds.add("rule:" + v); S.selRule = v; changed();
+  } });
+
+  return h("div", { class: "panel" },
+    h("div", { class: "toolbar" },
+      h("h2", { style: "margin:0" }, r.name || r.id), h("span", { class: "spacer" }),
+      h("label", { class: "check" }, h("input", { type: "checkbox", checked: r.enabled, onchange: (e) => { r.enabled = e.target.checked; render(); } }), "启用"),
+      h("button", { class: "danger", onclick: () => {
+        if (!confirm("删除规则「" + (r.name || r.id) + "」？" + (bound.length ? "\n" + bound.length + " 个 Key 会被解绑。" : ""))) return;
+        d.rules = d.rules.filter((x) => x !== r);
+        for (const k of d.keys) k.rule_ids = k.rule_ids.filter((x) => x !== r.id);
+        S.selRule = null; render();
+      } }, "删除")),
+    h("div", { class: "notice " + (bound.length ? "info" : "warn") + " small" },
+      bound.length ? "作用于 " + bound.length + " 个 Key：" + bound.map(keyName).join("、") : "还没有 Key 绑定这条规则，保存后不会生效。到「API Key」页面绑定。"),
+    h("div", { class: "row" },
+      h("div", { class: "field" }, h("span", { class: "lbl" }, "规则 ID"), idInput,
+        h("div", { class: "hint" }, isNew ? "小写字母、数字、. _ -；保存后不可修改" : "已保存的规则 ID 不可修改")),
+      h("div", { class: "field" }, h("span", { class: "lbl" }, "名称"), h("input", { type: "text", value: r.name || "", style: "width:100%", oninput: set("name") }))),
+    h("div", { class: "row" },
+      h("div", { class: "field" }, h("span", { class: "lbl" }, "模型"), modelsTa,
+        h("div", { class: "hint" }, "客户端请求中的模型名（包括别名），支持 * 和 ? 通配符，区分大小写。多行之间是“或”的关系。")),
+      h("div", { class: "field" }, h("span", { class: "lbl" }, "从 CPA 模型中选择"), pickerFilter, picker)),
+    h("div", { class: "field" }, preview),
+    h("div", { class: "field" }, h("span", { class: "lbl" }, "接口格式"),
+      FORMATS.map(([v, l]) => h("label", { class: "check" }, h("input", { type: "checkbox", checked: r.formats.includes(v), onchange: toggleIn("formats", v) }), l)),
+      h("div", { class: "hint" }, "都不勾选表示所有格式。")),
+    h("div", { class: "field" }, h("span", { class: "lbl" }, "检查内容"),
+      h("label", { class: "check" }, h("input", { type: "checkbox", checked: r.check_text, onchange: set("check_text") }), "文本（OpenAI 审核）"),
+      h("label", { class: "check" }, h("input", { type: "checkbox", checked: r.check_image, onchange: set("check_image") }), "图片（OpenAI 审核）"),
+      h("div", { class: "hint" }, "词库匹配不受这两项影响：勾选了词库就会检查文本。")),
+    h("div", { class: "field" }, h("span", { class: "lbl" }, "审核哪些角色的消息"),
+      ROLES.map(([v, l]) => h("label", { class: "check" }, h("input", { type: "checkbox", checked: (r.include_roles.length ? r.include_roles : DEFAULT_ROLES).includes(v), onchange: (e) => {
+        const cur = r.include_roles.length ? r.include_roles : [...DEFAULT_ROLES];
+        r.include_roles = e.target.checked ? uniq([...cur, v]) : cur.filter((x) => x !== v);
+        changed();
+      } }), l))),
+    h("div", { class: "field" }, h("span", { class: "lbl" }, "对话历史范围"),
+      h("label", { class: "check" }, h("input", { type: "radio", name: "hist", checked: !r.history_last_n, onchange: () => { r.history_last_n = 0; histInput.disabled = true; changed(); } }), "全部消息"),
+      h("label", { class: "check" }, h("input", { type: "radio", name: "hist", checked: !!r.history_last_n, onchange: () => { r.history_last_n = parseInt(histInput.value, 10) || 20; histInput.disabled = false; changed(); } }), "只审核最近", histInput, "条"),
+      h("div", { class: "hint" }, "系统提示词始终审核。已审核通过的历史消息会被缓存，不会重复调用审核接口。")),
+    h("div", { class: "field" }, h("span", { class: "lbl" }, "词库"),
+      d.wordlists.length ? d.wordlists.map((w) => h("label", { class: "check" }, h("input", { type: "checkbox", checked: r.wordlists.includes(w.id), onchange: toggleIn("wordlists", w.id) }), w.name || w.id, w.enabled ? "" : " (停用)"))
+        : h("span", { class: "muted small" }, "还没有词库")),
+    h("div", { class: "field" }, h("span", { class: "lbl" }, "只记录、不拦截的类别"),
+      h("div", {}, CATEGORIES.map((cat) => h("label", { class: "check", title: NEVER_LOG.has(cat) ? "该类别始终拦截" : "" },
+        h("input", { type: "checkbox", disabled: NEVER_LOG.has(cat), checked: r.category_actions[cat] === "log", onchange: (e) => {
+          if (e.target.checked) r.category_actions[cat] = "log"; else delete r.category_actions[cat];
+          changed();
+        } }), h("span", { class: "mono" }, cat)))),
+      h("div", { class: "hint" }, "默认所有类别都拦截。多条规则同时命中时，只有所有规则都设为“只记录”的类别才不拦截。sexual/minors 始终拦截。")),
+    h("div", { class: "row" },
+      h("div", { class: "field" }, h("span", { class: "lbl" }, "无法审核的内容（音频、文件、服务端引用等）"),
+        h("select", { onchange: set("unsupported_content") },
+          h("option", { value: "deny", selected: r.unsupported_content !== "allow" }, "拒绝请求（400）"),
+          h("option", { value: "allow", selected: r.unsupported_content === "allow" }, "忽略这部分并继续"))),
+      h("div", { class: "field" }, h("span", { class: "lbl" }, "审核服务故障时"),
+        h("select", { onchange: (e) => { r.on_error = e.target.value; onErrorWarn.classList.toggle("hidden", r.on_error !== "allow"); changed(); } },
+          h("option", { value: "deny", selected: r.on_error !== "allow" }, "拒绝请求（503，推荐）"),
+          h("option", { value: "allow", selected: r.on_error === "allow" }, "放行（不审核）")),
+        onErrorWarn)));
+}
+
+// ---------- wordlists ----------
+function newWordlist() {
+  let n = 1;
+  while (S.draft.wordlists.some((w) => w.id === "words-" + n)) n++;
+  const w = { id: "words-" + n, name: "词库 " + n, enabled: true, keywords: [], regex: [] };
+  S.draft.wordlists.push(w); S.newIds.add("wl:" + w.id); S.selList = w.id;
+  render();
+}
+function viewWordlists() {
+  const d = S.draft;
+  if (!S.selList || !d.wordlists.some((w) => w.id === S.selList)) S.selList = d.wordlists[0]?.id || null;
+  const w = d.wordlists.find((x) => x.id === S.selList);
+  return h("div", { class: "split" },
+    h("div", {},
+      h("div", { class: "toolbar" }, h("button", { class: "primary", onclick: newWordlist }, "新建词库")),
+      h("div", { class: "list" }, !d.wordlists.length ? h("div", { class: "item muted" }, "暂无词库") :
+        d.wordlists.map((x) => h("div", { class: "item" + (x.id === S.selList ? " active" : ""), onclick: () => { S.selList = x.id; render(); } },
+          h("div", { class: "t" }, x.name || x.id, x.enabled ? null : badge("停用")),
+          h("div", { class: "muted small" }, x.keywords.length + " 个关键词 · " + x.regex.length + " 条正则"))))),
+    w ? wordlistEditor(w) : h("div", { class: "panel muted" }, "词库在请求发往 OpenAI 之前先在本地匹配，命中就直接拒绝。词库需要在规则中勾选才会生效。"));
+}
+function wordlistEditor(w) {
+  const d = S.draft;
+  const isNew = S.newIds.has("wl:" + w.id);
+  const users = d.rules.filter((r) => r.wordlists.includes(w.id));
+  const kw = h("textarea", { rows: 14, placeholder: "每行一个关键词", oninput: (e) => { w.keywords = lines(e.target.value); count.textContent = w.keywords.length + " 个"; changed(); } });
+  kw.value = w.keywords.join("\n");
+  const re = h("textarea", { rows: 5, placeholder: "每行一条 RE2 正则，例如 (?i)\\bfoo\\d+\\b", oninput: (e) => { w.regex = lines(e.target.value); changed(); } });
+  re.value = w.regex.join("\n");
+  const count = h("span", { class: "muted small" }, w.keywords.length + " 个");
+  const fileIn = h("input", { type: "file", accept: ".txt,text/plain", class: "hidden", onchange: async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 8 << 20) { toast("文件过大（上限 8MB）", "error"); return; }
+    let text;
+    try { text = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer()); }
+    catch (_) { toast("文件不是 UTF-8 编码，请转换后再导入", "error", 8000); return; }
+    const before = w.keywords.length;
+    w.keywords = uniq([...w.keywords, ...lines(text)]);
+    toast("已导入 " + (w.keywords.length - before) + " 个新关键词（未保存）", "ok");
+    render();
+  } });
+  return h("div", { class: "panel" },
+    h("div", { class: "toolbar" },
+      h("h2", { style: "margin:0" }, w.name || w.id), h("span", { class: "spacer" }),
+      h("label", { class: "check" }, h("input", { type: "checkbox", checked: w.enabled, onchange: (e) => { w.enabled = e.target.checked; render(); } }), "启用"),
+      h("button", { onclick: () => fileIn.click() }, "导入 txt"), fileIn,
+      h("button", { onclick: () => {
+        const blob = new Blob([w.keywords.join("\n") + "\n"], { type: "text/plain;charset=utf-8" });
+        const a = h("a", { href: URL.createObjectURL(blob), download: w.id + ".txt" });
+        document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      } }, "导出 txt"),
+      h("button", { class: "danger", onclick: () => {
+        if (!confirm("删除词库「" + (w.name || w.id) + "」？" + (users.length ? "\n将从 " + users.length + " 条规则中移除。" : ""))) return;
+        d.wordlists = d.wordlists.filter((x) => x !== w);
+        for (const r of d.rules) r.wordlists = r.wordlists.filter((x) => x !== w.id);
+        S.selList = null; render();
+      } }, "删除")),
+    h("div", { class: "notice " + (users.length ? "info" : "warn") + " small" },
+      users.length ? "被以下规则使用：" + users.map((r) => r.name || r.id).join("、") : "还没有规则使用这个词库，到「审核规则」中勾选才会生效。"),
+    h("div", { class: "row" },
+      h("div", { class: "field" }, h("span", { class: "lbl" }, "词库 ID"),
+        h("input", { type: "text", class: "mono", value: w.id, disabled: !isNew, oninput: (e) => {
+          const v = e.target.value.trim(); S.newIds.delete("wl:" + w.id); w.id = v; S.newIds.add("wl:" + v); S.selList = v; changed();
+        } })),
+      h("div", { class: "field" }, h("span", { class: "lbl" }, "名称"), h("input", { type: "text", value: w.name || "", style: "width:100%", oninput: (e) => { w.name = e.target.value; changed(); } }))),
+    h("div", { class: "field" }, h("span", { class: "lbl" }, "关键词 ", count), kw,
+      h("div", { class: "hint" }, "匹配前会做 Unicode NFKC 规范化、统一大小写并去掉零宽字符，因此全角和大小写变体也能命中。命中时只记录词库 ID 和序号，不记录具体的词。")),
+    h("div", { class: "field" }, h("span", { class: "lbl" }, "正则表达式（RE2）"), re,
+      h("div", { class: "hint" }, "匹配的是规范化之后的文本（已转为小写）。语法错误会在保存时报出。")));
+}
+
+// ---------- simulate ----------
+const TEMPLATES = {
+  "openai": { model: "gpt-image-1", body: { model: "gpt-image-1", messages: [{ role: "system", content: "You are helpful." }, { role: "user", content: "画一座雪山" }] } },
+  "openai-response": { model: "gpt-6-mini", body: { model: "gpt-6-mini", instructions: "Be concise.", input: [{ role: "user", content: [{ type: "input_text", text: "hello" }] }] } },
+  "openai-image": { model: "gpt-image-1", body: { model: "gpt-image-1", prompt: "a mountain at sunrise" } },
+  "claude": { model: "claude-sonnet", body: { model: "claude-sonnet", max_tokens: 64, system: "sys", messages: [{ role: "user", content: "hello" }] } },
+  "gemini": { model: "gemini-pro", body: { contents: [{ role: "user", parts: [{ text: "hello" }] }] } },
+};
+function viewSimulate() {
+  const d = S.draft;
+  const keySel = h("select", {}, h("option", { value: "" }, "选择 Key…"), d.keys.map((k) => h("option", { value: k.scope }, keyName(k) + (k.rule_ids.length ? "" : "（未绑定）"))));
+  const fmtSel = h("select", {}, FORMATS.map(([v, l]) => h("option", { value: v }, l)));
+  const modelIn = h("input", { type: "text", placeholder: "模型名", list: "sim-models" });
+  const dl = h("datalist", { id: "sim-models" }, (S.models || []).map((m) => h("option", { value: m.id })));
+  const body = h("textarea", { rows: 12 });
+  const callProv = h("input", { type: "checkbox" });
+  const fill = () => { const t = TEMPLATES[fmtSel.value]; body.value = JSON.stringify(t.body, null, 2); if (!modelIn.value) modelIn.value = t.model; };
+  fmtSel.addEventListener("change", () => { modelIn.value = ""; fill(); });
+  fill();
+  const out = h("div", { class: "result" }, S.simResult ? simResultView(S.simResult) : null);
+  return h("div", {},
+    isDirty() ? h("div", { class: "notice warn" }, "模拟使用的是已保存的配置，当前未保存的修改不会参与模拟。") : null,
+    h("div", { class: "panel" },
+      h("h2", {}, "模拟一个请求"),
+      h("p", { class: "muted small" }, "按照真实请求的流程走一遍规则匹配、内容提取和词库匹配。请求不会转发到上游。"),
+      h("div", { class: "row" },
+        h("div", { class: "field" }, h("span", { class: "lbl" }, "Key"), keySel),
+        h("div", { class: "field" }, h("span", { class: "lbl" }, "接口格式"), fmtSel),
+        h("div", { class: "field" }, h("span", { class: "lbl" }, "模型"), modelIn, dl)),
+      h("div", { class: "field" }, h("span", { class: "lbl" }, "请求体（JSON）"), body),
+      h("div", { class: "field" }, h("label", { class: "check" }, callProv, "同时调用 OpenAI 审核接口"),
+        h("div", { class: "hint" }, "勾选后，请求内容会真实发送到审核接口。不勾选时只检查规则匹配、内容提取和词库，结果中的“通过”不代表 OpenAI 也会放行。")),
+      h("button", { class: "primary", onclick: async () => {
+        let parsed;
+        try { parsed = JSON.parse(body.value); } catch (_) { toast("请求体不是合法 JSON", "error"); return; }
+        if (!keySel.value) { toast("请选择 Key", "warn"); return; }
+        await guard(async () => {
+          S.simResult = await api("POST", BASE + "/simulate", { scope: keySel.value, model: modelIn.value.trim(), format: fmtSel.value, body: parsed, call_provider: callProv.checked });
+          out.replaceChildren(simResultView(S.simResult));
+        });
+      } }, "运行模拟"),
+      out));
+}
+const OUTCOME = { skip: ["未命中规则，不审核", ""], allow: ["通过", "ok"], block: ["拦截（违规）", "bad"], error: ["拒绝（无法审核）", "warn"] };
+function simResultView(r) {
+  const [label, kind] = OUTCOME[r.outcome] || [r.outcome, ""];
+  return h("div", { class: "panel", style: "margin-top:14px" },
+    h("div", { class: "toolbar" }, badge(label, kind), r.status ? h("span", { class: "mono" }, "HTTP " + r.status + " " + (r.code || "")) : null,
+      h("span", { class: "muted small" }, r.provider_called ? "已调用审核接口" : "未调用审核接口")),
+    h("table", {}, h("tbody", {},
+      row("命中规则", (r.rules || []).map(ruleName).join("、") || "—"),
+      row("原因", r.reason || "—"),
+      row("违规类别", (r.categories || []).join(", ") || "—"),
+      row("只记录的类别", (r.logged_categories || []).join(", ") || "—"),
+      row("提取内容", (r.texts ?? 0) + " 段文本，" + (r.images ?? 0) + " 张图片"),
+      row("说明", (r.notes || []).join("；") || "—"),
+      row("详细信息", r.detail || "—"))));
+}
+function row(k, v) { return h("tr", {}, h("th", { style: "width:140px;position:static" }, k), h("td", {}, v)); }
+
+// ---------- events ----------
+function viewEvents() {
+  const byScope = new Map((S.draft?.keys || []).map((k) => [k.scope.slice(0, 12), k]));
+  const sel = h("select", { onchange: async (e) => { S.evOutcome = e.target.value; await guard(loadEvents); render(); } },
+    [["", "全部结果"], ["block", "拦截"], ["error", "拒绝（无法审核）"], ["allow", "通过"]].map(([v, l]) => h("option", { value: v, selected: S.evOutcome === v }, l)));
+  return h("div", { class: "panel" },
+    h("div", { class: "toolbar" }, h("h2", { style: "margin:0" }, "审核记录"), sel,
+      h("button", { onclick: async () => { await guard(loadEvents); render(); } }, "刷新"),
+      h("span", { class: "spacer" }),
+      h("span", { class: "muted small" }, "最近 " + S.events.length + " 条（仅保存在内存中，重启后清空；完整记录见 audit_file）。不包含请求原文。")),
+    !S.events.length ? h("div", { class: "muted" }, "暂无记录。只有命中规则的请求才会产生记录。") :
+    h("div", { class: "table-wrap" }, h("table", { class: "wide" },
+      h("thead", {}, h("tr", {}, ["时间", "结果", "Key", "模型", "格式", "规则", "原因 / 类别", "内容", "耗时"].map((t) => h("th", {}, t)))),
+      h("tbody", {}, S.events.map((e) => {
+        const [label, kind] = OUTCOME[e.outcome] || [e.outcome, ""];
+        const k = byScope.get(e.scope);
+        const model = e.requested_model && e.requested_model !== e.model ? e.requested_model + " → " + e.model : e.model;
+        return h("tr", {},
+          h("td", { class: "small", style: "white-space:nowrap" }, fmtTime(e.time)),
+          h("td", {}, badge(label, kind), e.status ? h("div", { class: "muted small mono" }, String(e.status)) : null),
+          h("td", { class: "mono small" }, k ? keyName(k) : e.scope),
+          h("td", { class: "mono small nowrap" }, model, e.stream ? h("div", {}, badge("stream")) : null),
+          h("td", { class: "small" }, e.format, h("div", { class: "muted mono" }, e.path || "")),
+          h("td", { class: "small" }, (e.rules || []).join(", ")),
+          h("td", { class: "small" }, e.reason || "", (e.categories || []).length ? h("div", {}, (e.categories || []).map((c) => badge(c, "bad"))) : null,
+            (e.logged_categories || []).length ? h("div", {}, (e.logged_categories || []).map((c) => badge(c + "（记录）", "warn"))) : null,
+            e.detail ? h("div", { class: "muted mono", style: "word-break:break-word" }, e.detail) : null,
+            (e.notes || []).length ? h("div", { class: "muted" }, e.notes.join("；")) : null),
+          h("td", { class: "small nowrap" }, e.texts + " 文本 / " + e.images + " 图", e.cache_hits ? h("div", { class: "muted" }, "缓存命中 " + e.cache_hits) : null),
+          h("td", { class: "small mono nowrap" }, e.duration_ms.toFixed(1) + " ms", e.calls ? h("div", { class: "muted" }, e.calls + " 次调用") : null));
+      })))));
+}
+
+// ---------- boot ----------
+(async () => {
+  let key = "";
+  try { key = sessionStorage.getItem(KEY_STORE) || ""; } catch (_) {}
+  if (key && await login(key, false)) return;
+  const pk = panelKey();
+  if (pk && await login(pk, false)) return;
+  showGate("");
+})();
+})();
+</script>
+</body>
+</html>

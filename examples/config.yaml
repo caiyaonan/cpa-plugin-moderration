@@ -1,0 +1,32 @@
+# Add under the CLIProxyAPI config.yaml. Requires CLIProxyAPI v8.1.2+ with plugins.
+# Put cpa-moderation.so (Linux) / .dll (Windows) into plugins.dir and restart CPA.
+plugins:
+  enabled: true
+  dir: "plugins"
+  configs:
+    cpa-moderation:
+      enabled: true          # false disables ALL moderation (requests pass through)
+      priority: 1            # keep lower than plugins that rewrite request bodies
+      state_file: "plugins/cpa-moderation-state-v1.json"   # rules / wordlists / key bindings
+      audit_file: "plugins/cpa-moderation-audit.jsonl"     # no content; "" disables
+      audit_max_mb: 50
+      remote_images: "pass"  # pass: URL is sent to the moderation API; deny: reject
+      openai:
+        base_url: "https://api.openai.com/v1"
+        api_key_env: "OPENAI_MODERATION_API_KEY"  # set this env var on the CPA container
+        model: "omni-moderation-latest"
+        proxy_url: ""
+        timeout_ms: 8000
+        max_inflight: 16
+        queue_timeout_ms: 250
+        texts_per_request: 16
+        images_per_request: 1
+        chunk_chars: 8000
+        chunk_overlap: 200
+        cache_ttl_seconds: 600
+        cache_max_entries: 10000
+      limits:
+        max_body_bytes: 33554432
+        max_text_bytes: 262144
+        max_images: 8
+        max_image_bytes: 10485760

@@ -1,0 +1,56 @@
+config-version: 8
+server:
+  host: "127.0.0.1"
+  port: 18318
+management:
+  allow-remote: false
+  secret-key: "e2e-mgmt-secret"   # test-only; matches run_e2e.sh
+  disable-control-panel: true
+access:
+  api-keys:
+    - "sk-poc-image-business"
+    - "sk-poc-other"
+routing:
+  retry:
+    request-retry: 2
+  cooldown:
+    disable-cooling: true
+api-keys:
+  openai-compatibility:
+    - name: "mock-a"
+      base-url: "http://127.0.0.1:18081/v1"
+      keys:
+        - api-key: "upstream-a"
+      models:
+        - name: "mock-chat"
+          alias: "mock-chat"
+        - name: "gpt-image-1"
+          alias: "gpt-image-1"
+          image: true
+        - name: "gpt-6-mini"
+          alias: "gpt-6-mini"
+        - name: "gpt-6-mini"
+          alias: "friendly-alias"
+  claude:
+    - name: "claude-mock"
+      base-url: "http://127.0.0.1:18081"
+      keys:
+        - api-key: "upstream-claude"
+      models:
+        - name: "claude-mock"
+          alias: "claude-mock"
+oauth:
+  auth-dir: "./auth"
+plugins:
+  enabled: true
+  dir: "plugins"
+  configs:
+    cpa-moderation:
+      enabled: true
+      priority: 1
+      state_file: "plugins/cpa-moderation-state-v1.json"
+      audit_file: "plugins/cpa-moderation-audit.jsonl"
+      openai:
+        base_url: "http://127.0.0.1:18081/v1"
+        api_key_env: "OPENAI_MODERATION_API_KEY"
+        timeout_ms: 3000

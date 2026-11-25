@@ -1,0 +1,13 @@
+poc/run/*
+!poc/run/config.yaml
+*.dll
+*.so
+*.h
+dist/
+poc/e2e/*
+!poc/e2e/config.yaml
+!poc/e2e/run_e2e.sh
+.playwright-mcp/
+poc/combo/*
+!poc/combo/config.yaml
+!poc/combo/run_combo.sh
