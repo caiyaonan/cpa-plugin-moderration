@@ -63,4 +63,7 @@ plugins:
 
 - 用 CPA 自身的 `SelectReleaseAssets` → `ParseChecksums` → `VerifyChecksum` → `InstallArchive` 校验了 linux/amd64、linux/arm64、windows/amd64 三个包，全部通过。
 - 在真实 CPA v8.1.2 中搭建本地 registry v2 源，通过 `POST /v0/management/plugin-store/cpa-moderation/install` 完成安装：下载、校验、解压、**热加载并注册**（`restart_required: false`），`registered: true`、`effective_enabled: true`。重启 CPA 后依然能加载，状态无警告。
-- 尚未验证：GitHub Release 路径的实际下载（需要先发布一次）、macOS 产物（需要 macos runner 或 Mac 本机）、Linux 产物在 Docker 中的实际加载。
+- **v0.1.0 已发布**：https://github.com/caiyaonan/cpa-plugin-moderration/releases/tag/v0.1.0 。Check 和 Release 工作流第一次运行就全部通过，其中 `go test -race` 在 Linux 上通过。
+- 下载已发布的 5 个资产独立复核：`sha256sum -c` 全部 OK；每个 zip 只有一个位于根目录的库文件，格式和架构正确（ELF x86_64/aarch64、PE x86_64、Mach-O x86_64/arm64），权限 755，导出 `cliproxy_plugin_init`。
+- **GitHub Release 路径实测**：给 CPA v8.1.2 一个只带 `repository` 的 registry v1 条目（与官方商店格式相同），CPA 自己找到 latest release v0.1.0，完成下载、校验、安装和热加载（`install_type: github-release`，`restart_required: false`），装上的文件与 Release 中的完全一致，并在配置中记录了 `release-tag: v0.1.0`。
+- 尚未验证：macOS 产物的实际加载（需要 Mac），Linux 产物在 Docker 中的实际加载。
