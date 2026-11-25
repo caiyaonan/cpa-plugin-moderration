@@ -1,0 +1,48 @@
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then echo "$unformatted"; exit 1; fi
+      - name: go vet
+        run: go vet ./...
+      - name: go test -race
+        run: CGO_ENABLED=1 go test -race -count=1 ./...
+      - name: Admin page script syntax
+        run: |
+          python3 - <<'EOF'
+          import re
+          s = open("internal/plugin/web/ui.html", encoding="utf-8").read()
+          open("/tmp/ui.js", "w", encoding="utf-8").write(re.search(r"<script>(.*)</script>", s, re.S).group(1))
+          EOF
+          node --check /tmp/ui.js
+      - name: Cross-build smoke test (linux/amd64, windows/amd64)
+        run: |
+          pip install --quiet ziglang==0.17.1
+          bash scripts/build.sh linux/amd64 windows/amd64
+          python3 scripts/package.py
+          unzip -l dist/release/cpa-moderation_*_linux_amd64.zip

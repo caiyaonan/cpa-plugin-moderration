@@ -116,4 +116,4 @@ before 阶段的 `Model` 是客户端请求的名字，还没有按别名解析�
 | 模型调用走 `host.model.*`，不复制宿主凭证 | ✅ 不适用 | 插件不调用生成模型，只用独立的审核 Key（环境变量） |
 | 最小验证：`GET /v0/management/plugins` 显示 `registered: true`、`effective_enabled: true` | ✅ | 已实测，菜单「CPA Moderation」可见 |
 | `X-CPA-SUPPORT-PLUGIN: 1` | ⚠️ 环境原因 | 本机测试用的 CPA 是不带 CGO 编译的（Windows 不需要 CGO 也能加载插件），所以返回 0；官方 Docker 镜像使用 `CGO_ENABLED=1` 编译，应返回 1，需要在 Docker 环境中复核 |
-| 插件商店：`<id>_<version>_<goos>_<goarch>.zip`（zip 根目录直接放库文件）+ `checksums.txt`，`repository` 必须是 `https://github.com/{owner}/{repo}` | ❌ 未做 | 还没有发布流程；`GitHubRepository` 目前是占位值，发布前必须改成真实仓库地址 |
+| 插件商店：`<id>_<version>_<goos>_<goarch>.zip`（zip 根目录直接放库文件）+ `checksums.txt`，`repository` 必须是 `https://github.com/{owner}/{repo}` | ✅ | `scripts/build.sh` + `scripts/package.py` + `release.yml`；已用 CPA 安装器和真实的商店安装接口验证，见 docs/release.md |

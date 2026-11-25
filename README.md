@@ -36,6 +36,15 @@ CGO_ENABLED=1 CC="python -m ziglang cc -target x86_64-windows-gnu" GOAMD64=v1 go
 
 文件名必须是 `cpa-moderation.<ext>`，因为文件名就是插件 ID。
 
+也可以用脚本一次性构建多个平台并打包成插件商店格式：
+
+```bash
+bash scripts/build.sh linux/amd64 linux/arm64 windows/amd64
+python3 scripts/package.py --tag v0.1.0     # 输出到 dist/release/：各平台 zip + checksums.txt
+```
+
+推送 `v*` tag 会触发 GitHub Actions 构建 5 个平台的包并自动发布 Release。发布流程和商店上架方法见 [docs/release.md](docs/release.md)。
+
 ## 测试
 
 ```bash
@@ -85,7 +94,7 @@ go vet ./... && go test ./...
 
 ## 对照官方插件开发文档
 
-已逐项对照 [插件开发文档](https://help.router-for.me/cn/plugin/development.html)，结果见 [docs/compatibility.md](docs/compatibility.md) §8。有意偏离的一项：审核请求没有走 `host.http.do`（它没有按次调用的超时），改用插件自带的、有超时和并发限制的 HTTP 客户端。尚未完成：插件商店的发布包。
+已逐项对照 [插件开发文档](https://help.router-for.me/cn/plugin/development.html)，结果见 [docs/compatibility.md](docs/compatibility.md) §8。有意偏离的一项：审核请求没有走 `host.http.do`（它没有按次调用的超时），改用插件自带的、有超时和并发限制的 HTTP 客户端。发布包已按商店格式实现，并在真实 CPA 中通过商店接口安装验证过。
 
 ## 已知限制
 

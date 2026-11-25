@@ -14,11 +14,14 @@ import (
 )
 
 type Config struct {
-	Enabled   bool   `yaml:"enabled" json:"enabled"`
-	Priority  int    `yaml:"priority" json:"priority"`
-	StateFile string `yaml:"state_file" json:"state_file"`
-	OpenAI    OpenAI `yaml:"openai" json:"openai"`
-	Limits    Limits `yaml:"limits" json:"limits"`
+	// Enabled, Priority and Store are owned by the host (plugins.configs.<id>);
+	// Store is written by plugin-store installs to pin the installed version.
+	Enabled   bool      `yaml:"enabled" json:"enabled"`
+	Priority  int       `yaml:"priority" json:"priority"`
+	Store     yaml.Node `yaml:"store,omitempty" json:"-"`
+	StateFile string    `yaml:"state_file" json:"state_file"`
+	OpenAI    OpenAI    `yaml:"openai" json:"openai"`
+	Limits    Limits    `yaml:"limits" json:"limits"`
 	// RemoteImages controls http(s) image URLs: "pass" forwards the URL to the
 	// moderation API (OpenAI fetches it; the plugin never downloads), "deny" rejects.
 	RemoteImages string `yaml:"remote_images" json:"remote_images"`

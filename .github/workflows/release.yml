@@ -1,0 +1,87 @@
+name: Release
+
+# Push a tag such as v0.1.0 (it must equal Version in internal/plugin/types.go).
+# Produces the CLIProxyAPI plugin-store assets:
+#   cpa-moderation_<version>_<goos>_<goarch>.zip  (library at the zip root)
+#   checksums.txt
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    uses: ./.github/workflows/check.yml
+
+  build-linux-windows:
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Verify tag matches plugin version
+        run: |
+          version=$(sed -n 's/^\s*Version\s*=\s*"\(.*\)"/\1/p' internal/plugin/types.go)
+          [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME != Version $version"; exit 1; }
+      - name: Build (zig, glibc 2.17 baseline for Linux)
+        run: |
+          pip install --quiet ziglang==0.17.1
+          bash scripts/build.sh linux/amd64 linux/arm64 windows/amd64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-linux-windows
+          path: dist/build/
+          if-no-files-found: error
+
+  build-darwin:
+    needs: check
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build (clang)
+        run: bash scripts/build.sh darwin/arm64 darwin/amd64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-darwin
+          path: dist/build/
+          if-no-files-found: error
+
+  publish:
+    needs: [build-linux-windows, build-darwin]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/build/
+          merge-multiple: true
+      - name: Package
+        run: |
+          python3 scripts/package.py --tag "$GITHUB_REF_NAME"
+          ls -l dist/release
+          (cd dist/release && sha256sum -c checksums.txt)
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag \
+            dist/release/*.zip dist/release/checksums.txt
