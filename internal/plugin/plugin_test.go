@@ -619,3 +619,50 @@ func TestAPIKeyFromPluginConfigIsNeverEchoed(t *testing.T) {
 		}
 	}
 }
+
+func TestAdvertisedFieldsAreFlatAndKnown(t *testing.T) {
+	a, _ := newTestApp(t, &fakeModerator{fn: flagOn("x", "y")}, "")
+	var reg Registration
+	_ = json.Unmarshal(call(t, a, MethodPluginRegister, LifecycleRequest{}).Result, &reg)
+	seen := map[string]bool{}
+	sample := map[string]string{"string": "x", "integer": "7", "enum": "deny", "boolean": "true"}
+	for _, f := range reg.Metadata.ConfigFields {
+		if f.Type == "object" || f.Type == "array" {
+			t.Errorf("%s is %s: management UIs render it as a raw JSON box", f.Name, f.Type)
+		}
+		if seen[f.Name] {
+			t.Errorf("duplicate field %s", f.Name)
+		}
+		seen[f.Name] = true
+		if f.Description == "" {
+			t.Errorf("%s has no description", f.Name)
+		}
+		v := sample[f.Type]
+		switch f.Name {
+		case "api_base_url":
+			v = "https://example.com/v1"
+		case "proxy_url":
+			v = "http://127.0.0.1:7890"
+		case "state_file", "audit_file":
+			v = "plugins/x.json"
+		}
+		// Every advertised field must be accepted without an unknown-field warning.
+		if _, warnings, err := config.Decode([]byte(f.Name + ": " + v + "\n")); err != nil || len(warnings) != 0 {
+			t.Errorf("advertised field %s is not understood by the plugin: %v %v", f.Name, err, warnings)
+		}
+	}
+	for _, want := range []string{"api_key", "moderation_model", "proxy_url", "timeout_ms", "max_concurrency", "remote_images"} {
+		if !seen[want] {
+			t.Errorf("field %s must be offered in the management UI", want)
+		}
+	}
+}
+
+func TestFlatAPIKeyHotReload(t *testing.T) {
+	a, _ := newTestApp(t, &fakeModerator{fn: flagOn("x", "y")}, "")
+	cfg := a.rt.Load().cfg
+	call(t, a, MethodPluginReconfigure, LifecycleRequest{ConfigYAML: []byte(fmt.Sprintf("state_file: %q\naudit_file: \"\"\napi_key: sk-from-ui\n", filepath.ToSlash(cfg.StateFile)))})
+	if got := a.rt.Load().cfg.OpenAI.APIKey; got != "sk-from-ui" {
+		t.Fatalf("api_key set from the management UI must apply on reconfigure, got %q", got)
+	}
+}

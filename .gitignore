@@ -13,3 +13,4 @@ poc/combo/*
 !poc/combo/run_combo.sh
 poc/store/*
 poc/selfstore/*
+poc/panel/*

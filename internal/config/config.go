@@ -31,6 +31,52 @@ type Config struct {
 	AuditFile  string `yaml:"audit_file" json:"audit_file"`
 	AuditMaxMB int    `yaml:"audit_max_mb" json:"audit_max_mb"`
 	Debug      bool   `yaml:"debug" json:"debug"`
+	// Flat holds top-level shortcuts for the common nested settings. Host
+	// management UIs render object fields as raw JSON, so these are what the
+	// plugin advertises in ConfigFields. Non-empty / non-zero values override
+	// the nested openai.* and limits.* values.
+	Flat `yaml:",inline" json:"-"`
+}
+
+type Flat struct {
+	APIKey          string `yaml:"api_key"`
+	APIKeyEnv       string `yaml:"api_key_env"`
+	ModerationModel string `yaml:"moderation_model"`
+	APIBaseURL      string `yaml:"api_base_url"`
+	ProxyURL        string `yaml:"proxy_url"`
+	TimeoutMS       int    `yaml:"timeout_ms"`
+	MaxConcurrency  int    `yaml:"max_concurrency"`
+	MaxBodyBytes    int    `yaml:"max_body_bytes"`
+	MaxTextBytes    int    `yaml:"max_text_bytes"`
+	MaxImages       int    `yaml:"max_images"`
+	MaxImageBytes   int    `yaml:"max_image_bytes"`
+}
+
+// applyFlat copies set shortcuts over the nested values. Zero means "not set";
+// negative numbers are copied so Validate reports them.
+func (c *Config) applyFlat() {
+	f := c.Flat
+	setS := func(dst *string, v string) {
+		if v = strings.TrimSpace(v); v != "" {
+			*dst = v
+		}
+	}
+	setI := func(dst *int, v int) {
+		if v != 0 {
+			*dst = v
+		}
+	}
+	setS(&c.OpenAI.APIKey, f.APIKey)
+	setS(&c.OpenAI.APIKeyEnv, f.APIKeyEnv)
+	setS(&c.OpenAI.Model, f.ModerationModel)
+	setS(&c.OpenAI.BaseURL, f.APIBaseURL)
+	setS(&c.OpenAI.ProxyURL, f.ProxyURL)
+	setI(&c.OpenAI.TimeoutMS, f.TimeoutMS)
+	setI(&c.OpenAI.MaxInflight, f.MaxConcurrency)
+	setI(&c.Limits.MaxBodyBytes, f.MaxBodyBytes)
+	setI(&c.Limits.MaxTextBytes, f.MaxTextBytes)
+	setI(&c.Limits.MaxImages, f.MaxImages)
+	setI(&c.Limits.MaxImageBytes, f.MaxImageBytes)
 }
 
 type OpenAI struct {
@@ -115,6 +161,7 @@ func Decode(raw []byte) (Config, []string, error) {
 			}
 		}
 	}
+	cfg.applyFlat()
 	if err := cfg.Validate(); err != nil {
 		return Config{}, nil, err
 	}

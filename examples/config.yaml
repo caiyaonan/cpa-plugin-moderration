@@ -1,33 +1,42 @@
 # Add under the CLIProxyAPI config.yaml. Requires CLIProxyAPI v8.1.2+ with plugins.
-# Put cpa-moderation.so (Linux) / .dll (Windows) into plugins.dir and restart CPA.
+# Every field below can also be edited in CPAMC: 插件 → cpa-moderation → 编辑配置.
+# Empty / omitted fields use the defaults shown in the comments.
 plugins:
   enabled: true
   dir: "plugins"
   configs:
     cpa-moderation:
       enabled: true          # false disables ALL moderation (requests pass through)
-      priority: 1            # keep lower than plugins that rewrite request bodies
+      priority: 1            # higher runs first; keep below plugins that rewrite request bodies
+
+      # Moderation API
+      api_key: ""                              # OpenAI API key; takes precedence over api_key_env
+      api_key_env: "OPENAI_MODERATION_API_KEY" # environment variable read when api_key is empty
+      moderation_model: "omni-moderation-latest"
+      proxy_url: ""                            # e.g. http://127.0.0.1:7890; empty = direct
+      api_base_url: "https://api.openai.com/v1"
+      timeout_ms: 8000
+      max_concurrency: 16
+
+      # Content limits for moderated requests
+      remote_images: "pass"    # pass: image URLs go to the moderation API; deny: reject them
+      max_body_bytes: 33554432
+      max_text_bytes: 262144
+      max_images: 8
+      max_image_bytes: 10485760
+
+      # Storage
       state_file: "plugins/cpa-moderation-state-v1.json"   # rules / wordlists / key bindings
       audit_file: "plugins/cpa-moderation-audit.jsonl"     # no content; "" disables
       audit_max_mb: 50
-      remote_images: "pass"  # pass: URL is sent to the moderation API; deny: reject
-      openai:
-        base_url: "https://api.openai.com/v1"
-        api_key: ""                               # OpenAI API key; takes precedence over api_key_env
-        api_key_env: "OPENAI_MODERATION_API_KEY"  # used when api_key is empty
-        model: "omni-moderation-latest"
-        proxy_url: ""
-        timeout_ms: 8000
-        max_inflight: 16
-        queue_timeout_ms: 250
-        texts_per_request: 16
-        images_per_request: 1
-        chunk_chars: 8000
-        chunk_overlap: 200
-        cache_ttl_seconds: 600
-        cache_max_entries: 10000
-      limits:
-        max_body_bytes: 33554432
-        max_text_bytes: 262144
-        max_images: 8
-        max_image_bytes: 10485760
+      event_buffer: 1000
+
+      # Advanced (nested form, still supported; flat fields above override these):
+      # openai:
+      #   queue_timeout_ms: 250
+      #   texts_per_request: 16
+      #   images_per_request: 1
+      #   chunk_chars: 8000
+      #   chunk_overlap: 200
+      #   cache_ttl_seconds: 600
+      #   cache_max_entries: 10000
