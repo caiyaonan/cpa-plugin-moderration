@@ -39,6 +39,11 @@ bash scripts/build.sh linux/amd64 linux/arm64 windows/amd64
 python3 scripts/package.py --tag v0.1.0     # 输出到 dist/release/
 ```
 
+## 发布失败时
+
+- 如果 `publish` 任务在 “Create GitHub release” 失败，而 check 和各平台构建都已成功，多半是 GitHub API 的临时故障（v0.1.1 发布时就遇到了 GitHub 的 Partial System Outage：HTTP 500）。在 Actions 页面对这次运行点 “Re-run failed jobs” 即可，不需要重新打 tag。
+- 如果重跑时报 `ReleaseAsset.name already exists`，说明上一次已经留下了一个**草稿** Release。先下载草稿，用 `sha256sum -c checksums.txt` 校验，确认 5 个 zip 和 `checksums.txt` 齐全且正确后，执行 `gh release edit vX.Y.Z --draft=false --latest` 直接发布；也可以删除草稿后再重跑。
+
 ## 本仓库自带的商店源
 
 根目录的 `registry.json`（`schema_version: 1`）就是一个只包含本插件的商店源。在 CPA 中加入：
@@ -80,4 +85,5 @@ plugins:
 - **v0.1.0 已发布**：https://github.com/caiyaonan/cpa-plugin-moderration/releases/tag/v0.1.0 。Check 和 Release 工作流第一次运行就全部通过，其中 `go test -race` 在 Linux 上通过。
 - 下载已发布的 5 个资产独立复核：`sha256sum -c` 全部 OK；每个 zip 只有一个位于根目录的库文件，格式和架构正确（ELF x86_64/aarch64、PE x86_64、Mach-O x86_64/arm64），权限 755，导出 `cliproxy_plugin_init`。
 - **GitHub Release 路径实测**：给 CPA v8.1.2 一个只带 `repository` 的 registry v1 条目（与官方商店格式相同），CPA 自己找到 latest release v0.1.0，完成下载、校验、安装和热加载（`install_type: github-release`，`restart_required: false`），装上的文件与 Release 中的完全一致，并在配置中记录了 `release-tag: v0.1.0`。
+- **v0.1.1 升级实测**：在通过本仓库商店源安装了 v0.1.0 的 CPA 中，商店显示 `update_available: true`；点安装后升级到 v0.1.1 并热加载（`restart_required: false`），配置里的 `release-tag` 自动更新为 v0.1.1。旧版本不认识 `openai.api_key`，只是给出警告、没有失效；升级后状态显示 `api_key_source: config`，警告消失。
 - 尚未验证：macOS 产物的实际加载（需要 Mac），Linux 产物在 Docker 中的实际加载。
