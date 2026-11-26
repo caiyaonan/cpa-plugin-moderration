@@ -1,0 +1,2 @@
+(制作|制造|合成|制备|配方|教程|怎么做|如何做).{0,6}(炸药|炸弹|雷管|毒剂|神经毒|沙林|芥子气|蓖麻毒素|炭疽|脏弹)
+how to (make|build|synthesize|produce).{0,20}(bomb|explosive|nerve agent|sarin|ricin|anthrax|mustard gas|dirty bomb)
