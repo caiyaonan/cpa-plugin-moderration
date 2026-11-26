@@ -6,8 +6,9 @@ import (
 	"time"
 )
 
-// Cache remembers keys of inputs that passed moderation. It stores only
-// hashes, never content, and never caches flagged results or errors.
+// Cache remembers inputs that passed moderation, keyed by content hash, with
+// their category scores so stricter per-rule thresholds still apply to cache
+// hits. It never stores content, flagged results or errors.
 type Cache struct {
 	mu    sync.Mutex
 	max   int
@@ -20,6 +21,7 @@ type Cache struct {
 type entry struct {
 	key     string
 	expires time.Time
+	scores  map[string]float64
 }
 
 func NewCache(max int, ttl time.Duration) *Cache {
@@ -29,25 +31,34 @@ func NewCache(max int, ttl time.Duration) *Cache {
 func (c *Cache) enabled() bool { return c != nil && c.max > 0 && c.ttl > 0 }
 
 func (c *Cache) Has(key string) bool {
+	_, ok := c.Get(key)
+	return ok
+}
+
+// Get returns the cached category scores of a passed input.
+func (c *Cache) Get(key string) (map[string]float64, bool) {
 	if !c.enabled() {
-		return false
+		return nil, false
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	el, ok := c.items[key]
 	if !ok {
-		return false
+		return nil, false
 	}
-	if c.now().After(el.Value.(*entry).expires) {
+	e := el.Value.(*entry)
+	if c.now().After(e.expires) {
 		c.ll.Remove(el)
 		delete(c.items, key)
-		return false
+		return nil, false
 	}
 	c.ll.MoveToFront(el)
-	return true
+	return e.scores, true
 }
 
-func (c *Cache) Put(key string) {
+func (c *Cache) Put(key string) { c.PutScores(key, nil) }
+
+func (c *Cache) PutScores(key string, scores map[string]float64) {
 	if !c.enabled() {
 		return
 	}
@@ -55,11 +66,12 @@ func (c *Cache) Put(key string) {
 	defer c.mu.Unlock()
 	exp := c.now().Add(c.ttl)
 	if el, ok := c.items[key]; ok {
-		el.Value.(*entry).expires = exp
+		e := el.Value.(*entry)
+		e.expires, e.scores = exp, scores
 		c.ll.MoveToFront(el)
 		return
 	}
-	c.items[key] = c.ll.PushFront(&entry{key: key, expires: exp})
+	c.items[key] = c.ll.PushFront(&entry{key: key, expires: exp, scores: scores})
 	for c.ll.Len() > c.max {
 		last := c.ll.Back()
 		c.ll.Remove(last)

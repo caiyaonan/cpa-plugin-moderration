@@ -292,7 +292,7 @@ $("btn-logout").addEventListener("click", () => {
 function isDirty() { return S.draft && S.server && JSON.stringify(S.draft) !== JSON.stringify(S.server); }
 function normalizeState(st) {
   st.rules ||= []; st.wordlists ||= []; st.keys ||= [];
-  for (const r of st.rules) { r.models ||= []; r.formats ||= []; r.include_roles ||= []; r.wordlists ||= []; r.category_actions ||= {}; }
+  for (const r of st.rules) { r.models ||= []; r.formats ||= []; r.include_roles ||= []; r.wordlists ||= []; r.category_actions ||= {}; r.category_thresholds ||= {}; }
   for (const w of st.wordlists) { w.keywords ||= []; w.regex ||= []; }
   for (const k of st.keys) { k.rule_ids ||= []; }
   return st;
@@ -607,6 +607,17 @@ function ruleEditor(r) {
     h("div", { class: "field" }, h("span", { class: "lbl" }, "词库"),
       d.wordlists.length ? d.wordlists.map((w) => h("label", { class: "check" }, h("input", { type: "checkbox", checked: r.wordlists.includes(w.id), onchange: toggleIn("wordlists", w.id) }), w.name || w.id, w.enabled ? "" : " (停用)"))
         : h("span", { class: "muted small" }, "还没有词库")),
+    h("div", { class: "field" }, h("span", { class: "lbl" }, "更严格的分数阈值（可选）"),
+      h("div", { class: "row", style: "gap:8px 16px" }, CATEGORIES.map((cat) => h("label", { class: "check", style: "min-width:230px" },
+        h("span", { class: "mono", style: "min-width:150px" }, cat),
+        h("input", { type: "number", min: 0.01, max: 1, step: 0.05, placeholder: "—", style: "width:80px",
+          value: r.category_thresholds[cat] ?? "", oninput: (e) => {
+            const v = parseFloat(e.target.value);
+            if (e.target.value === "" || isNaN(v)) delete r.category_thresholds[cat]; else r.category_thresholds[cat] = v;
+            changed();
+          } })))),
+      h("div", { class: "hint" }, "审核接口为每个类别给出 0–1 的分数，默认只在接口判定违规（flagged）时拦截。填了阈值的类别，分数达到即拦截，即使接口没有判定违规。",
+        "生图业务的安全系统比审核接口更严，建议从 sexual 0.2、sexual/minors 0.01、violence/graphic 0.3 起步，再根据「审核记录」里的分数调整。只能让规则更严格，不会放行接口判定违规的内容。")),
     h("div", { class: "field" }, h("span", { class: "lbl" }, "只记录、不拦截的类别"),
       h("div", {}, CATEGORIES.map((cat) => h("label", { class: "check", title: NEVER_LOG.has(cat) ? "该类别始终拦截" : "" },
         h("input", { type: "checkbox", disabled: NEVER_LOG.has(cat), checked: r.category_actions[cat] === "log", onchange: (e) => {
@@ -752,9 +763,15 @@ function simResultView(r) {
       row("原因", r.reason || "—"),
       row("违规类别", (r.categories || []).join(", ") || "—"),
       row("只记录的类别", (r.logged_categories || []).join(", ") || "—"),
+      row("各类别最高分", scoreView(r.scores) || "—"),
       row("提取内容", (r.texts ?? 0) + " 段文本，" + (r.images ?? 0) + " 张图片"),
       row("说明", (r.notes || []).join("；") || "—"),
       row("详细信息", r.detail || "—"))));
+}
+// Highest category scores, e.g. "sexual 0.43 · violence 0.12".
+function scoreView(scores, limit) {
+  const list = Object.entries(scores || {}).sort((a, b) => b[1] - a[1]).slice(0, limit || 6);
+  return list.map(([k, v]) => k + " " + v.toFixed(2)).join(" · ");
 }
 function row(k, v) { return h("tr", {}, h("th", { style: "width:140px;position:static" }, k), h("td", {}, v)); }
 
@@ -784,6 +801,7 @@ function viewEvents() {
           h("td", { class: "small" }, (e.rules || []).join(", ")),
           h("td", { class: "small" }, e.reason || "", (e.categories || []).length ? h("div", {}, (e.categories || []).map((c) => badge(c, "bad"))) : null,
             (e.logged_categories || []).length ? h("div", {}, (e.logged_categories || []).map((c) => badge(c + "（记录）", "warn"))) : null,
+            e.scores ? h("div", { class: "muted mono" }, scoreView(e.scores, 3)) : null,
             e.detail ? h("div", { class: "muted mono", style: "word-break:break-word" }, e.detail) : null,
             (e.notes || []).length ? h("div", { class: "muted" }, e.notes.join("；")) : null),
           h("td", { class: "small nowrap" }, e.texts + " 文本 / " + e.images + " 图", e.cache_hits ? h("div", { class: "muted" }, "缓存命中 " + e.cache_hits) : null),

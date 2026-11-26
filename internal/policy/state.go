@@ -29,19 +29,22 @@ type State struct {
 }
 
 type Rule struct {
-	ID                 string            `json:"id"`
-	Name               string            `json:"name"`
-	Enabled            bool              `json:"enabled"`
-	Models             []string          `json:"models"`
-	Formats            []string          `json:"formats,omitempty"`
-	CheckText          bool              `json:"check_text"`
-	CheckImage         bool              `json:"check_image"`
-	IncludeRoles       []string          `json:"include_roles,omitempty"`
-	HistoryLastN       int               `json:"history_last_n,omitempty"`
-	CategoryActions    map[string]string `json:"category_actions,omitempty"`
-	Wordlists          []string          `json:"wordlists,omitempty"`
-	UnsupportedContent string            `json:"unsupported_content"`
-	OnError            string            `json:"on_error"`
+	ID              string            `json:"id"`
+	Name            string            `json:"name"`
+	Enabled         bool              `json:"enabled"`
+	Models          []string          `json:"models"`
+	Formats         []string          `json:"formats,omitempty"`
+	CheckText       bool              `json:"check_text"`
+	CheckImage      bool              `json:"check_image"`
+	IncludeRoles    []string          `json:"include_roles,omitempty"`
+	HistoryLastN    int               `json:"history_last_n,omitempty"`
+	CategoryActions map[string]string `json:"category_actions,omitempty"`
+	// CategoryThresholds blocks when a category score reaches the value even if
+	// the moderation API did not flag the input. It can only make a rule stricter.
+	CategoryThresholds map[string]float64 `json:"category_thresholds,omitempty"`
+	Wordlists          []string           `json:"wordlists,omitempty"`
+	UnsupportedContent string             `json:"unsupported_content"`
+	OnError            string             `json:"on_error"`
 }
 
 type Wordlist struct {
@@ -215,6 +218,11 @@ func (s *State) Validate() error {
 			}
 			if action == "log" && neverLogOnly[cat] {
 				add("rule %q: category %q must always block", r.ID, cat)
+			}
+		}
+		for cat, th := range r.CategoryThresholds {
+			if strings.TrimSpace(cat) == "" || th <= 0 || th > 1 {
+				add("rule %q threshold %q=%v is invalid (must be > 0 and <= 1)", r.ID, cat, th)
 			}
 		}
 		for _, w := range r.Wordlists {

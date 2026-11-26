@@ -264,6 +264,7 @@ func (a *App) simulate(req ManagementRequest) ManagementResponse {
 		"reason":            d.Reason,
 		"categories":        d.Categories,
 		"logged_categories": d.LoggedCategories,
+		"scores":            d.Scores,
 		"texts":             d.Texts,
 		"images":            d.Images,
 		"notes":             d.Notes,

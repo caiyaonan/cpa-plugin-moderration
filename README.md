@@ -60,7 +60,9 @@ plugins:
 
 Docker 部署时还要把 `plugins` 目录挂载出来（例如 `./plugins:/CLIProxyAPI/plugins`）：插件文件和规则数据都在里面，不挂载的话重建容器就会丢失。
 
-装好后打开 `http://<CPA 地址>/v0/resource/plugins/cpa-moderation/ui` 配置规则。也可以从 [Releases](https://github.com/caiyaonan/cpa-plugin-moderration/releases) 手动下载 zip，把里面的库文件放进 `plugins/` 后重启。
+装好后打开 `http://<CPA 地址>/v0/resource/plugins/cpa-moderation/ui` 配置规则。可以直接导入的示例词库（越狱话术、武器、恶意软件、诈骗、隐私数据、生图裸露等）见 [examples/wordlists](examples/wordlists/)。
+
+**生图业务注意**：OpenAI 生图接口的安全系统比审核接口严格，审核接口放行的裸露、性感类提示词仍可能被生图接口拒绝（`moderation_blocked`）。建议在生图规则里挂上 `image-nudity` 词库，并设置「更严格的分数阈值」（例如 `sexual` 0.2）。审核记录会显示每个类别的最高分，方便调整阈值。也可以从 [Releases](https://github.com/caiyaonan/cpa-plugin-moderration/releases) 手动下载 zip，把里面的库文件放进 `plugins/` 后重启。
 
 ## 构建
 

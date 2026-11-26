@@ -110,14 +110,23 @@ type Item struct {
 
 type Verdict struct {
 	Flagged    bool
-	Categories []string // union of flagged categories, sorted
+	Categories []string           // union of flagged categories, sorted
+	Scores     map[string]float64 // highest score per category across all items (incl. cache hits)
 	CacheHits  int
 	Calls      int
 }
 
+func mergeMax(dst map[string]float64, src map[string]float64) {
+	for k, v := range src {
+		if v > dst[k] {
+			dst[k] = v
+		}
+	}
+}
+
 // Moderate checks all items. Any flagged item flags the verdict.
 func (c *Client) Moderate(ctx context.Context, items []Item) (Verdict, error) {
-	var v Verdict
+	v := Verdict{Scores: map[string]float64{}}
 	if len(items) == 0 {
 		return v, nil
 	}
@@ -162,7 +171,10 @@ func (c *Client) Moderate(ctx context.Context, items []Item) (Verdict, error) {
 			return fmt.Errorf("%w: expected %d results, got %d", ErrUnavailable, len(batch), len(results))
 		}
 		anyFlagged := false
+		combined := map[string]float64{}
 		for _, r := range results {
+			mergeMax(combined, r.Scores)
+			mergeMax(v.Scores, r.Scores)
 			if !r.Flagged {
 				continue
 			}
@@ -179,12 +191,12 @@ func (c *Client) Moderate(ctx context.Context, items []Item) (Verdict, error) {
 			}
 		}
 		for i, p := range batch {
-			flagged := anyFlagged
+			flagged, scores := anyFlagged, combined
 			if perItem {
-				flagged = results[i].Flagged
+				flagged, scores = results[i].Flagged, results[i].Scores
 			}
 			if !flagged && p.cacheKey != "" {
-				c.cache.Put(p.cacheKey)
+				c.cache.PutScores(p.cacheKey, scores)
 			}
 		}
 		if anyFlagged {
@@ -235,8 +247,13 @@ type pending struct {
 func (c *Client) dropCached(in []pending, v *Verdict) []pending {
 	out := in[:0]
 	for _, p := range in {
-		if p.cacheKey != "" && c.cache.Has(p.cacheKey) {
+		if p.cacheKey == "" {
+			out = append(out, p)
+			continue
+		}
+		if scores, ok := c.cache.Get(p.cacheKey); ok {
 			v.CacheHits++
+			mergeMax(v.Scores, scores)
 			continue
 		}
 		out = append(out, p)
@@ -276,13 +293,15 @@ func (c *Client) acquire(ctx context.Context) error {
 }
 
 type apiResult struct {
-	Flagged    *bool           `json:"flagged"`
-	Categories map[string]bool `json:"categories"`
+	Flagged        *bool              `json:"flagged"`
+	Categories     map[string]bool    `json:"categories"`
+	CategoryScores map[string]float64 `json:"category_scores"`
 }
 
 type result struct {
 	Flagged    bool
 	Categories map[string]bool
+	Scores     map[string]float64
 }
 
 func (c *Client) call(ctx context.Context, key string, input any) ([]result, error) {
@@ -326,7 +345,7 @@ func (c *Client) call(ctx context.Context, key string, input any) ([]result, err
 		if r.Flagged == nil {
 			return nil, fmt.Errorf("%w: result %d has no flagged field", ErrUnavailable, i)
 		}
-		out[i] = result{Flagged: *r.Flagged, Categories: r.Categories}
+		out[i] = result{Flagged: *r.Flagged, Categories: r.Categories, Scores: r.CategoryScores}
 	}
 	return out, nil
 }

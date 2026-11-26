@@ -43,6 +43,7 @@ type Effective struct {
 	Roles           map[string]bool
 	HistoryLastN    int // 0 = whole history
 	LogOnly         map[string]bool
+	Thresholds      map[string]float64 // lowest (strictest) threshold per category
 	Wordlists       []Wordlist
 	DenyUnsupported bool
 	DenyOnError     bool
@@ -92,7 +93,7 @@ func matchAnyModel(patterns, models []string) bool {
 }
 
 func (s *Snapshot) merge(rules []Rule) *Effective {
-	eff := &Effective{Roles: map[string]bool{}}
+	eff := &Effective{Roles: map[string]bool{}, Thresholds: map[string]float64{}}
 	logVotes := map[string]int{}
 	wl := map[string]bool{}
 	wholeHistory := false
@@ -115,6 +116,11 @@ func (s *Snapshot) merge(rules []Rule) *Effective {
 		for cat, action := range r.CategoryActions {
 			if action == "log" {
 				logVotes[cat]++
+			}
+		}
+		for cat, th := range r.CategoryThresholds {
+			if cur, ok := eff.Thresholds[cat]; !ok || th < cur {
+				eff.Thresholds[cat] = th
 			}
 		}
 		for _, id := range r.Wordlists {

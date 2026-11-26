@@ -12,7 +12,7 @@ const (
 
 	// PluginID is the library file name, the plugins.configs key and the route segment.
 	PluginID         = "cpa-moderation"
-	Version          = "0.1.2"
+	Version          = "0.1.3"
 	GitHubRepository = "https://github.com/caiyaonan/cpa-plugin-moderration"
 	MenuLabel        = "CPA Moderation"
 )

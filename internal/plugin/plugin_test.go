@@ -666,3 +666,37 @@ func TestFlatAPIKeyHotReload(t *testing.T) {
 		t.Fatalf("api_key set from the management UI must apply on reconfigure, got %q", got)
 	}
 }
+
+func TestScoreThresholdBlocksUnflaggedContent(t *testing.T) {
+	mod := &fakeModerator{fn: func(items []moderation.Item) (moderation.Verdict, error) {
+		// Not flagged by the API, but a high sexual score (the "nude portrait" case).
+		return moderation.Verdict{Scores: map[string]float64{"sexual": 0.37, "violence": 0.004}, Calls: 1}, nil
+	}}
+	a, _ := newTestApp(t, mod, "")
+	setupPolicy(t, a)
+	if r := intercept(t, a, bizKey, "openai-image", "gpt-image-1", `{"prompt":"portrait"}`); r.Terminate {
+		t.Fatalf("without a threshold only flagged content is blocked: %+v", r)
+	}
+	_, st := mgmt(t, a, http.MethodGet, "/state", nil)
+	raw, _ := json.Marshal(st)
+	var state policy.State
+	_ = json.Unmarshal(raw, &state)
+	state.Rules[0].CategoryThresholds = map[string]float64{"sexual": 0.2}
+	if code, out := mgmt(t, a, http.MethodPut, "/state", state); code != 200 {
+		t.Fatalf("save thresholds: %v", out)
+	}
+	r := intercept(t, a, bizKey, "openai-image", "gpt-image-1", `{"prompt":"portrait"}`)
+	if !r.Terminate || r.StatusCode != 403 || errCode(t, r) != engine.CodeViolation {
+		t.Fatalf("score over threshold must block: %+v", r)
+	}
+	if strings.Contains(string(r.ResponseBody), "0.37") || strings.Contains(string(r.ResponseBody), "sexual") {
+		t.Fatal("refusal must not reveal categories or scores to the client")
+	}
+	ev := a.events.snapshot(1)[0]
+	if ev.Reason != "score_threshold" || len(ev.Categories) != 1 || ev.Categories[0] != "sexual" || ev.Scores["sexual"] != 0.37 {
+		t.Fatalf("audit event must explain the block: %+v", ev)
+	}
+	if _, ok := ev.Scores["violence"]; ok {
+		t.Fatal("negligible scores (< 0.01) are not recorded")
+	}
+}

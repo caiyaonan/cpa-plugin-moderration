@@ -5,6 +5,7 @@ package engine
 import (
 	"context"
 	"errors"
+	"math"
 	"net/http"
 	"sort"
 	"time"
@@ -54,13 +55,16 @@ type Decision struct {
 	Reason           string
 	Categories       []string
 	LoggedCategories []string
-	Texts            int
-	Images           int
-	CacheHits        int
-	Calls            int
-	Notes            []string
-	Detail           string // operator-facing error detail, content-free
-	Duration         time.Duration
+	// Scores holds the highest category scores seen (>= 0.01, rounded). They are
+	// operator diagnostics for tuning thresholds and never reach the client.
+	Scores    map[string]float64
+	Texts     int
+	Images    int
+	CacheHits int
+	Calls     int
+	Notes     []string
+	Detail    string // operator-facing error detail, content-free
+	Duration  time.Duration
 }
 
 type Engine struct {
@@ -140,6 +144,7 @@ func (e *Engine) evaluate(ctx context.Context, req Request) Decision {
 
 	v, err := e.Moderator.Moderate(ctx, items)
 	d.CacheHits, d.Calls = v.CacheHits, v.Calls
+	d.Scores = topScores(v.Scores)
 	if err != nil {
 		if !eff.DenyOnError {
 			d.Outcome = OutcomeAllow
@@ -169,8 +174,36 @@ func (e *Engine) evaluate(ctx context.Context, req Request) Decision {
 			return refuse(d, OutcomeBlock, http.StatusForbidden, CodeViolation, "moderation_flagged", "")
 		}
 	}
+	// Stricter per-rule thresholds: block on high scores the API did not flag.
+	var over []string
+	for cat, th := range eff.Thresholds {
+		if v.Scores[cat] >= th {
+			over = append(over, cat)
+		}
+	}
+	if len(over) > 0 {
+		sort.Strings(over)
+		d.Categories = over
+		return refuse(d, OutcomeBlock, http.StatusForbidden, CodeViolation, "score_threshold", "")
+	}
 	d.Outcome = OutcomeAllow
 	return d
+}
+
+func topScores(in map[string]float64) map[string]float64 {
+	if len(in) == 0 {
+		return nil
+	}
+	out := map[string]float64{}
+	for k, v := range in {
+		if v >= 0.01 {
+			out[k] = math.Round(v*1000) / 1000
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func refuse(d Decision, o Outcome, status int, code, reason, detail string) Decision {

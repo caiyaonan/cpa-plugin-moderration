@@ -14,28 +14,29 @@ import (
 // Event is the audit record of one moderated request. It never contains
 // request content, matched words, scores, raw keys or authorization headers.
 type Event struct {
-	Time             time.Time `json:"time"`
-	RequestID        string    `json:"request_id"`
-	Scope            string    `json:"scope"` // first 12 hex chars of the caller scope hash
-	Model            string    `json:"model"`
-	RequestedModel   string    `json:"requested_model"`
-	Format           string    `json:"format"`
-	Path             string    `json:"path,omitempty"`
-	Stream           bool      `json:"stream"`
-	Outcome          string    `json:"outcome"`
-	Status           int       `json:"status,omitempty"`
-	Code             string    `json:"code,omitempty"`
-	Rules            []string  `json:"rules,omitempty"`
-	Reason           string    `json:"reason,omitempty"`
-	Categories       []string  `json:"categories,omitempty"`
-	LoggedCategories []string  `json:"logged_categories,omitempty"`
-	Texts            int       `json:"texts"`
-	Images           int       `json:"images"`
-	CacheHits        int       `json:"cache_hits"`
-	Calls            int       `json:"calls"`
-	DurationMS       float64   `json:"duration_ms"`
-	Notes            []string  `json:"notes,omitempty"`
-	Detail           string    `json:"detail,omitempty"`
+	Time             time.Time          `json:"time"`
+	RequestID        string             `json:"request_id"`
+	Scope            string             `json:"scope"` // first 12 hex chars of the caller scope hash
+	Model            string             `json:"model"`
+	RequestedModel   string             `json:"requested_model"`
+	Format           string             `json:"format"`
+	Path             string             `json:"path,omitempty"`
+	Stream           bool               `json:"stream"`
+	Outcome          string             `json:"outcome"`
+	Status           int                `json:"status,omitempty"`
+	Code             string             `json:"code,omitempty"`
+	Rules            []string           `json:"rules,omitempty"`
+	Reason           string             `json:"reason,omitempty"`
+	Categories       []string           `json:"categories,omitempty"`
+	LoggedCategories []string           `json:"logged_categories,omitempty"`
+	Scores           map[string]float64 `json:"scores,omitempty"`
+	Texts            int                `json:"texts"`
+	Images           int                `json:"images"`
+	CacheHits        int                `json:"cache_hits"`
+	Calls            int                `json:"calls"`
+	DurationMS       float64            `json:"duration_ms"`
+	Notes            []string           `json:"notes,omitempty"`
+	Detail           string             `json:"detail,omitempty"`
 }
 
 func (a *App) recordEvent(req InterceptRequest, d engine.Decision) {
@@ -62,6 +63,7 @@ func (a *App) recordEvent(req InterceptRequest, d engine.Decision) {
 		Reason:           d.Reason,
 		Categories:       d.Categories,
 		LoggedCategories: d.LoggedCategories,
+		Scores:           d.Scores,
 		Texts:            d.Texts,
 		Images:           d.Images,
 		CacheHits:        d.CacheHits,

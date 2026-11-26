@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -249,5 +250,41 @@ func TestAPIKeyFromConfigTakesPrecedence(t *testing.T) {
 	_, err := c.Moderate(context.Background(), []Item{{Text: "c"}})
 	if !errors.Is(err, ErrUnavailable) || !strings.Contains(err.Error(), "openai.api_key") || c.KeyConfigured() {
 		t.Fatalf("missing key: %v", err)
+	}
+}
+
+// scored returns per-input category scores without flagging: "SEXUAL=0.35" in a
+// text yields sexual 0.35. Mirrors the real API, which reports scores for every input.
+func scored(w http.ResponseWriter, input any) {
+	var results []map[string]any
+	for _, it := range input.([]any) {
+		s, _ := it.(string)
+		score := 0.001
+		if i := strings.Index(s, "SEXUAL="); i >= 0 {
+			var f float64
+			_, _ = fmt.Sscanf(s[i+7:], "%g", &f)
+			score = f
+		}
+		results = append(results, map[string]any{"flagged": false,
+			"categories":      map[string]bool{"sexual": false},
+			"category_scores": map[string]float64{"sexual": score, "violence": 0.002}})
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"results": results})
+}
+
+func TestScoresReportedAndCached(t *testing.T) {
+	api := &fakeAPI{handle: scored}
+	c, _ := newClient(t, api)
+	items := []Item{{Text: "fine", Cacheable: true}, {Text: "SEXUAL=0.35 dress", Cacheable: true}}
+	v, err := c.Moderate(context.Background(), items)
+	if err != nil || v.Flagged || v.Scores["sexual"] != 0.35 {
+		t.Fatalf("first: %+v %v", v, err)
+	}
+	v, err = c.Moderate(context.Background(), items)
+	if err != nil || v.Calls != 0 || v.CacheHits != 2 {
+		t.Fatalf("second call must be served from cache: %+v %v", v, err)
+	}
+	if v.Scores["sexual"] != 0.35 {
+		t.Fatalf("cache hits must keep their scores so thresholds still apply: %+v", v.Scores)
 	}
 }

@@ -102,10 +102,15 @@ class H(BaseHTTPRequestHandler):
         if any("MODERATION_DOWN" in (i if isinstance(i, str) else "") for i in items):
             return self._json(500, {"error": {"message": "down"}})
         multimodal = any(isinstance(i, dict) for i in items)
+        def scores(it):
+            # Simulates the production case: nudity text is not flagged but scores high.
+            txt = it if isinstance(it, str) else json.dumps(it, ensure_ascii=False)
+            return {"sexual": 0.4 if ("裸露" in txt or "nude" in txt) else 0.001, "violence": 0.002}
         if multimodal:
-            res = [{"flagged": any(flagged(i) for i in items), "categories": {"violence": any(flagged(i) for i in items)}}]
+            res = [{"flagged": any(flagged(i) for i in items), "categories": {"violence": any(flagged(i) for i in items)},
+                    "category_scores": {"sexual": 0.001, "violence": 0.002}}]
         else:
-            res = [{"flagged": flagged(i), "categories": {"violence": flagged(i), "harassment": False}} for i in items]
+            res = [{"flagged": flagged(i), "categories": {"violence": flagged(i), "harassment": False}, "category_scores": scores(i)} for i in items]
         return self._json(200, {"id": "modr-1", "model": req.get("model"), "results": res})
 
     def _sse(self, events):

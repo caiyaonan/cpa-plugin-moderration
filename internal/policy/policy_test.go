@@ -208,3 +208,25 @@ func TestMinorsCategoryCannotBeLogOnly(t *testing.T) {
 		t.Fatal("sexual/minors must always block")
 	}
 }
+
+func TestThresholdsMergeStrictestAndValidate(t *testing.T) {
+	s := baseState()
+	s.Rules[0].CategoryThresholds = map[string]float64{"sexual": 0.4, "violence": 0.5}
+	s.Rules[1].CategoryThresholds = map[string]float64{"sexual": 0.2}
+	s.Normalize()
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	eff := NewSnapshot(s).Match(scopeOf("sk-a"), []string{"gpt-6-mini"}, "openai")
+	if eff.Thresholds["sexual"] != 0.2 || eff.Thresholds["violence"] != 0.5 {
+		t.Fatalf("strictest threshold must win: %+v", eff.Thresholds)
+	}
+	for _, bad := range []float64{0, -0.1, 1.5} {
+		s := baseState()
+		s.Rules[0].CategoryThresholds = map[string]float64{"sexual": bad}
+		s.Normalize()
+		if err := s.Validate(); err == nil {
+			t.Errorf("threshold %v must be rejected", bad)
+		}
+	}
+}
